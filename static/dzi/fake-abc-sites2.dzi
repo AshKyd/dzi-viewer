@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Image xmlns="http://schemas.microsoft.com/deepzoom/2008"
+  Url="https://www.abc.net.au/dat/news/zoomytellers/abcscam/fake-abc-sites2_files/"
+  Format="jpeg"
+  Overlap="1"
+  TileSize="254"
+  >
+  <Size 
+    Height="14967"
+    Width="8121"
+  />
+</Image>
