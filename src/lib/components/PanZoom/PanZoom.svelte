@@ -14,10 +14,14 @@
 	import DziViewer from '../DziViewer/DziViewer.svelte';
 	import type { DziViewerMethods } from '../DziViewer/dziViewerTypes.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
+	import { fade } from 'svelte/transition';
 	import {
 		computePinchStep,
 		computeWheelZoomMultiplier,
+		DEFAULT_COOPERATIVE_GESTURE_MESSAGES,
+		isApplePlatform,
 		panByScreenDelta,
+		shouldWheelZoom,
 		zoomAroundPoint
 	} from './panZoomUtils.js';
 
@@ -38,6 +42,8 @@
 		keyboardEnabled = true,
 		keyboardPanStep = 80,
 		keyboardZoomFactor = 1.25,
+		cooperativeGestures = false,
+		cooperativeGestureMessages,
 		onInteract,
 		...viewerProps
 	}: PanZoomProps = $props();
@@ -54,6 +60,52 @@
 	const interactive = $derived(!disabled && (panEnabled || zoomEnabled));
 	const canPan = $derived(!disabled && panEnabled);
 	const canZoom = $derived(!disabled && zoomEnabled);
+
+	// --- Cooperative gestures hint ---
+
+	const HINT_DURATION_MS = 1500;
+	const hintMessages = $derived({
+		...DEFAULT_COOPERATIVE_GESTURE_MESSAGES,
+		...cooperativeGestureMessages
+	});
+	let hintMessage = $state<string | null>(null);
+	let hintTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** Shows `message` over the viewer, hiding it once gestures stop for `HINT_DURATION_MS`. */
+	function showHint(message: string): void {
+		hintMessage = message;
+		clearTimeout(hintTimer);
+		hintTimer = setTimeout(() => (hintMessage = null), HINT_DURATION_MS);
+	}
+
+	$effect(() => () => clearTimeout(hintTimer));
+
+	// In cooperative mode the browser scrolls the page for one finger (`touch-action: pan-x pan-y`).
+	// Pointer events can't stop that, so a non-passive `touchmove` blocks it once a second finger is down.
+	$effect(() => {
+		const el = rootEl;
+		if (!el || !cooperativeGestures || !interactive) {
+			return;
+		}
+
+		const handleTouchMove = (event: TouchEvent) => {
+			if (event.touches.length === 1) {
+				showHint(hintMessages.touch);
+				return;
+			}
+			if (event.cancelable) {
+				event.preventDefault();
+			}
+		};
+
+		el.addEventListener('touchmove', handleTouchMove, { passive: false });
+		return () => el.removeEventListener('touchmove', handleTouchMove);
+	});
+
+	/** In cooperative mode, a lone touch scrolls the page instead of panning. */
+	function isCooperativeSingleTouch(event: PointerEvent): boolean {
+		return cooperativeGestures && event.pointerType === 'touch' && activePointers.size === 1;
+	}
 
 	// External updates to bound x/y/zoom override any active gesture immediately.
 	$effect(() => {
@@ -147,6 +199,12 @@
 			if (!canZoom) {
 				return;
 			}
+			const { ctrlKey, metaKey } = event;
+			if (!shouldWheelZoom({ cooperativeGestures, ctrlKey, metaKey })) {
+				// Leave the event alone so the page scrolls.
+				showHint(isApplePlatform(navigator.platform) ? hintMessages.wheelMac : hintMessages.wheel);
+				return;
+			}
 			event.preventDefault();
 
 			const multiplier = computeWheelZoomMultiplier({
@@ -178,7 +236,7 @@
 		activePointers.set(event.pointerId, point);
 		rootEl?.setPointerCapture(event.pointerId);
 
-		if (canPan) {
+		if (canPan && !isCooperativeSingleTouch(event)) {
 			isDragging = true;
 		}
 	}
@@ -193,7 +251,7 @@
 
 		if (activePointers.size === 1) {
 			activePointers.set(event.pointerId, nextPoint);
-			if (!canPan) {
+			if (!canPan || isCooperativeSingleTouch(event)) {
 				return;
 			}
 
@@ -346,6 +404,7 @@
 	class:dzi-panzoom-interactive={interactive}
 	class:dzi-panzoom-pannable={canPan}
 	class:dzi-panzoom-dragging={isDragging}
+	class:dzi-panzoom-cooperative={cooperativeGestures && interactive}
 	role="application"
 	aria-label={viewerProps.alt || 'Interactive deep zoom image viewer'}
 	aria-disabled={disabled ? 'true' : undefined}
@@ -368,6 +427,12 @@
 		{constraints}
 		{...viewerProps}
 	/>
+	{#if hintMessage}
+		<!-- Pointer-only guidance: keyboard and screen-reader users aren't affected by cooperative mode. -->
+		<div class="dzi-panzoom-hint" aria-hidden="true" transition:fade={{ duration: 150 }}>
+			{hintMessage}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -381,6 +446,28 @@
 
 	.dzi-panzoom-interactive {
 		touch-action: none;
+	}
+
+	/* After `.dzi-panzoom-interactive` so it wins: one finger scrolls the page, two are handled here. */
+	.dzi-panzoom-cooperative {
+		touch-action: pan-x pan-y;
+	}
+
+	.dzi-panzoom-hint {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		background: rgb(0 0 0 / 0.5);
+		color: #fff;
+		font:
+			500 1rem/1.4 system-ui,
+			sans-serif;
+		text-align: center;
+		pointer-events: none;
 	}
 
 	.dzi-panzoom-pannable {

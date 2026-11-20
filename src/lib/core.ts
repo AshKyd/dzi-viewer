@@ -2,10 +2,14 @@
 // Shared by the Svelte entry (`index.ts`) and the vanilla entry (`vanilla/index.ts`).
 
 export type { DziViewerMethods, DziViewerProps } from './components/DziViewer/dziViewerTypes.js';
-export type { PanZoomProps } from './components/PanZoom/panZoomTypes.js';
+export type {
+	CooperativeGestureMessages,
+	PanZoomProps
+} from './components/PanZoom/panZoomTypes.js';
 export {
 	computePinchStep,
 	computeWheelZoomMultiplier,
+	DEFAULT_COOPERATIVE_GESTURE_MESSAGES,
 	panByScreenDelta,
 	zoomAroundPoint
 } from './components/PanZoom/panZoomUtils.js';

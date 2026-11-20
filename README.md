@@ -113,6 +113,13 @@ All props are optional except `source`.
 
 `PanZoom` also takes `disabled`, `panEnabled`, `zoomEnabled`, `wheelZoomFactor`, `doubleClickZoomFactor`, `keyboardEnabled`, `keyboardPanStep`, `keyboardZoomFactor` and `onInteract`.
 
+Set `cooperativeGestures` on `PanZoom` when the viewer sits in a scrolling page, so it doesn't capture the page's scroll:
+
+- The mouse wheel only zooms with Ctrl (or ⌘ on a Mac) held. A plain scroll scrolls the page.
+- On touch screens, one finger scrolls the page and two fingers pan and zoom.
+- A short hint appears over the viewer when a scroll or one-finger drag passes through. Change its text with `cooperativeGestureMessages` (`{ wheel, wheelMac, touch }`).
+- Mouse drag, trackpad pinch, double-click and the keyboard work as normal.
+
 Read-only bindables: `containerSize`, `dzi` (the loaded descriptor) and `isOptimalLoaded` (true once every visible tile is loaded at the ideal resolution).
 
 ## Methods

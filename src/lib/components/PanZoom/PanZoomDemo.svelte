@@ -38,6 +38,8 @@
 		pauseWhileInteracting?: boolean;
 		/** Hold the resolution level while the user drags or zooms, releasing it shortly after they stop. */
 		holdResolutionWhileInteracting?: boolean;
+		/** Ctrl/⌘ + scroll to zoom and two-finger touch, so the page scrolls past the viewer. */
+		cooperativeGestures?: boolean;
 	}
 
 	let {
@@ -56,7 +58,8 @@
 		maxTileMountsPerFrame,
 		constrainToBounds = false,
 		pauseWhileInteracting = true,
-		holdResolutionWhileInteracting = true
+		holdResolutionWhileInteracting = true,
+		cooperativeGestures = false
 	}: Props = $props();
 
 	let viewer: DziViewerMethods | undefined = $state();
@@ -219,6 +222,7 @@
 			{panEnabled}
 			{zoomEnabled}
 			{wheelZoomFactor}
+			{cooperativeGestures}
 			{maxDpr}
 			{tileFadeDuration}
 			{maxTileMountsPerFrame}

@@ -1,6 +1,15 @@
 import type { Viewport } from '../../types.js';
 import type { DziViewerProps } from '../DziViewer/dziViewerTypes.js';
 
+export interface CooperativeGestureMessages {
+	/** Shown on a plain wheel scroll on Windows and Linux. */
+	wheel: string;
+	/** Shown on a plain wheel scroll on macOS and iOS. */
+	wheelMac: string;
+	/** Shown on a one-finger touch drag. */
+	touch: string;
+}
+
 export interface PanZoomProps extends DziViewerProps {
 	/** Disables all pointer, wheel, touch, and keyboard pan/zoom interactions. */
 	disabled?: boolean;
@@ -18,6 +27,14 @@ export interface PanZoomProps extends DziViewerProps {
 	keyboardPanStep?: number;
 	/** Zoom multiplier applied per `+`/`-` key press. */
 	keyboardZoomFactor?: number;
+	/**
+	 * Lets the page scroll past the viewer, like MapLibre's `cooperativeGestures`. The mouse wheel only zooms
+	 * with Ctrl (or ⌘ on a Mac) held, and touch needs two fingers to pan or zoom. A short hint appears when a
+	 * plain scroll or one-finger drag is passed through to the page. Trackpad pinch and mouse drag still work.
+	 */
+	cooperativeGestures?: boolean;
+	/** Overrides the hint text shown by `cooperativeGestures`. */
+	cooperativeGestureMessages?: Partial<CooperativeGestureMessages>;
 	/** Invoked whenever user pan/zoom interaction updates the viewport. */
 	onInteract?: (viewport: Viewport) => void;
 }

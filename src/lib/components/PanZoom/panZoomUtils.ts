@@ -1,4 +1,5 @@
 import type { Point, Size, Viewport, ViewportConstraints } from '../../types.js';
+import type { CooperativeGestureMessages } from './panZoomTypes.js';
 import { clampViewport, screenToStage } from '../../viewport.js';
 
 const MIN_SAFE_ZOOM = 1e-6;
@@ -149,4 +150,35 @@ export function computeWheelZoomMultiplier({
 	const divisor = ctrlKey ? 40 : 100;
 
 	return wheelZoomFactor ** (-clampedPixels / divisor);
+}
+
+// --- Cooperative gestures ---
+
+export const DEFAULT_COOPERATIVE_GESTURE_MESSAGES: CooperativeGestureMessages = {
+	wheel: 'Use Ctrl + scroll to zoom the image',
+	wheelMac: 'Use ⌘ + scroll to zoom the image',
+	touch: 'Use two fingers to move the image'
+};
+
+export interface CooperativeWheelParams {
+	readonly cooperativeGestures: boolean;
+	readonly ctrlKey: boolean;
+	readonly metaKey: boolean;
+}
+
+/**
+ * Whether a wheel event should zoom the viewer rather than scroll the page.
+ * Trackpad pinch arrives as a wheel event with `ctrlKey` set, so it still zooms in cooperative mode.
+ */
+export function shouldWheelZoom({
+	cooperativeGestures,
+	ctrlKey,
+	metaKey
+}: CooperativeWheelParams): boolean {
+	return !cooperativeGestures || ctrlKey || metaKey;
+}
+
+/** True on macOS and iOS, where the zoom modifier is shown as ⌘ instead of Ctrl. */
+export function isApplePlatform(platform: string): boolean {
+	return /Mac|iPhone|iPad|iPod/i.test(platform);
 }

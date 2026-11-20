@@ -46,6 +46,7 @@
 			tileFadeDuration: 200,
 			maxTileMountsPerFrame: 8,
 			constrainToBounds: false,
+			cooperativeGestures: false,
 			pauseWhileInteracting: true,
 			holdResolutionWhileInteracting: true
 		}

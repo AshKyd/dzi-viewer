@@ -3,9 +3,31 @@ import { stageToScreen } from '../../viewport.js';
 import {
 	computePinchStep,
 	computeWheelZoomMultiplier,
+	isApplePlatform,
 	panByScreenDelta,
+	shouldWheelZoom,
 	zoomAroundPoint
 } from './panZoomUtils.js';
+
+describe('cooperative gestures', () => {
+	it('only zooms on wheel with Ctrl or ⌘ held when cooperative, and always otherwise', () => {
+		const wheel = (cooperativeGestures: boolean, ctrlKey = false, metaKey = false) =>
+			shouldWheelZoom({ cooperativeGestures, ctrlKey, metaKey });
+
+		expect(wheel(false)).toBe(true);
+		expect(wheel(true)).toBe(false);
+		// Ctrl + wheel, and trackpad pinch (reported with `ctrlKey`).
+		expect(wheel(true, true)).toBe(true);
+		expect(wheel(true, false, true)).toBe(true);
+	});
+
+	it('detects Apple platforms for the ⌘ hint', () => {
+		expect(isApplePlatform('MacIntel')).toBe(true);
+		expect(isApplePlatform('iPhone')).toBe(true);
+		expect(isApplePlatform('Win32')).toBe(false);
+		expect(isApplePlatform('Linux x86_64')).toBe(false);
+	});
+});
 
 describe('panZoomUtils', () => {
 	const containerSize = { width: 800, height: 600 };
