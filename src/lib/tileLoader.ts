@@ -521,7 +521,7 @@ export class TileLoader {
 		try {
 			callback();
 		} catch (error) {
-			console.error('[openseahorse] TileLoader callback threw:', error);
+			console.error('[dzi-viewer] TileLoader callback threw:', error);
 		}
 	}
 

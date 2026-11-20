@@ -16,7 +16,7 @@ import type {
 // Component types live in plain `.ts` so type-aware tooling (ESLint, plain `tsc`) can read them.
 // Those tools can't parse `.svelte` files and would see every `.svelte` export as an error type.
 
-export interface OpenSeahorseProps {
+export interface DziViewerProps {
 	/** DZI descriptor URL (`.dzi` XML/JSON), inline DZI JSON object, or pre-parsed `DziDescriptor`. */
 	source: DziSourceInput;
 	/** Viewport centre X in virtual stage coordinates. */
@@ -71,8 +71,8 @@ export interface OpenSeahorseProps {
 	onTileError?: (event: TileErrorEvent) => void;
 }
 
-/** Methods exported by `OpenSeahorse` and `PanZoom` instances (via `bind:this`). */
-export interface OpenSeahorseMethods {
+/** Methods exported by `DziViewer` and `PanZoom` instances (via `bind:this`). */
+export interface DziViewerMethods {
 	/** Viewport that fits `bounds` inside the container (defaults to the image bounds). */
 	getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
 	/** Viewport that fills the container with `bounds` (defaults to the image bounds). */

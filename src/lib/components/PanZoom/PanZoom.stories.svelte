@@ -6,7 +6,7 @@
 	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
-		title: 'OpenSeahorse/PanZoom',
+		title: 'DziViewer/PanZoom',
 		component: PanZoomDemo,
 		tags: ['autodocs'],
 		argTypes: {

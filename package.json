@@ -1,6 +1,16 @@
 {
-	"name": "openseahorse",
+	"name": "dzi-viewer",
 	"version": "0.0.1",
+	"description": "Lightweight DOM-based Deep Zoom (DZI) image viewer for Svelte 5 and vanilla JavaScript.",
+	"license": "ISC",
+	"homepage": "https://github.com/AshKyd/dzi-viewer#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/AshKyd/dzi-viewer.git"
+	},
+	"bugs": {
+		"url": "https://github.com/AshKyd/dzi-viewer/issues"
+	},
 	"keywords": [
 		"svelte",
 		"dzi",
@@ -37,9 +47,9 @@
 			"import": "./dist/vanilla/index.js",
 			"default": "./dist/vanilla/index.js"
 		},
-		"./OpenSeahorse": {
-			"types": "./dist/components/OpenSeahorse/OpenSeahorse.svelte.d.ts",
-			"svelte": "./dist/components/OpenSeahorse/OpenSeahorse.svelte"
+		"./DziViewer": {
+			"types": "./dist/components/DziViewer/DziViewer.svelte.d.ts",
+			"svelte": "./dist/components/DziViewer/DziViewer.svelte"
 		},
 		"./PanZoom": {
 			"types": "./dist/components/PanZoom/PanZoom.svelte.d.ts",

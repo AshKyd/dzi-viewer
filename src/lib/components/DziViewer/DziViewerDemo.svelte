@@ -4,8 +4,8 @@
 	import { clampDpr, DEFAULT_MAX_DPR, getOptimalLevel } from '../../tiling.js';
 	import type { DziDescriptor, PrecacheResult, Rect, Size, Viewport } from '../../types.js';
 	import { resolveStageAndImageBounds } from '../../viewport.js';
-	import OpenSeahorse from './OpenSeahorse.svelte';
-	import type { OpenSeahorseMethods } from './openSeahorseTypes.js';
+	import DziViewer from './DziViewer.svelte';
+	import type { DziViewerMethods } from './dziViewerTypes.js';
 
 	interface Props {
 		/** DZI descriptor URL to display. */
@@ -37,7 +37,7 @@
 		tileFadeDuration = 200
 	}: Props = $props();
 
-	let viewer: OpenSeahorseMethods | undefined = $state();
+	let viewer: DziViewerMethods | undefined = $state();
 	let containerSize = $state<Size>({ width: 0, height: 0 });
 	let dzi = $state<DziDescriptor | null>(null);
 	let isOptimalLoaded = $state(false);
@@ -174,7 +174,7 @@
 	</div>
 
 	<div class="demo-stage">
-		<OpenSeahorse
+		<DziViewer
 			bind:this={viewer}
 			{source}
 			{stageSize}

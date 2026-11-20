@@ -1,9 +1,9 @@
 import { mount, unmount } from 'svelte';
-import OpenSeahorse from '../components/OpenSeahorse/OpenSeahorse.svelte';
+import DziViewer from '../components/DziViewer/DziViewer.svelte';
 import type {
-	OpenSeahorseMethods,
-	OpenSeahorseProps
-} from '../components/OpenSeahorse/openSeahorseTypes.js';
+	DziViewerMethods,
+	DziViewerProps
+} from '../components/DziViewer/dziViewerTypes.js';
 import PanZoom from '../components/PanZoom/PanZoom.svelte';
 import type { PanZoomProps } from '../components/PanZoom/panZoomTypes.js';
 import { EMPTY_PRECACHE_RESULT } from '../precache.js';
@@ -18,7 +18,7 @@ import type { ViewerStateSnapshot } from './vanillaUtils.js';
 
 export type { ViewerStateSnapshot } from './vanillaUtils.js';
 
-export interface VanillaOpenSeahorseOptions extends OpenSeahorseProps {
+export interface VanillaDziViewerOptions extends DziViewerProps {
 	/** Called once per change to `x`, `y`, `zoom`, `containerSize`, `dzi` or `isOptimalLoaded` made by the viewer. */
 	onStateChange?: StateChangeListener;
 }
@@ -28,9 +28,9 @@ export interface VanillaPanZoomOptions extends PanZoomProps {
 	onStateChange?: StateChangeListener;
 }
 
-export interface OpenSeahorseController extends OpenSeahorseMethods {
-	/** Updates any subset of `OpenSeahorse` props. Updating `x`, `y`, or `zoom` overrides the current viewport. */
-	update: (props: Partial<VanillaOpenSeahorseOptions>) => void;
+export interface DziViewerController extends DziViewerMethods {
+	/** Updates any subset of `DziViewer` props. Updating `x`, `y`, or `zoom` overrides the current viewport. */
+	update: (props: Partial<VanillaDziViewerOptions>) => void;
 	/** Sets the viewport centre and/or zoom. */
 	setViewport: (viewport: Partial<Viewport>) => void;
 	/** Returns the current `{ x, y, zoom }` viewport. */
@@ -41,14 +41,14 @@ export interface OpenSeahorseController extends OpenSeahorseMethods {
 	destroy: () => void;
 }
 
-export interface PanZoomController extends Omit<OpenSeahorseController, 'update'> {
-	/** Updates any subset of `PanZoom` or `OpenSeahorse` props. Updating `x`, `y`, or `zoom` overrides the current position. */
+export interface PanZoomController extends Omit<DziViewerController, 'update'> {
+	/** Updates any subset of `PanZoom` or `DziViewer` props. Updating `x`, `y`, or `zoom` overrides the current position. */
 	update: (props: Partial<VanillaPanZoomOptions>) => void;
 }
 
 /** What `mount(VanillaBridge)` returns: the bridge's exported functions. */
 interface MountedBridge {
-	getViewer: () => OpenSeahorseMethods | undefined;
+	getViewer: () => DziViewerMethods | undefined;
 }
 
 /**
@@ -106,19 +106,19 @@ function createController(
 }
 
 /**
- * Mounts an `OpenSeahorse` viewer into any DOM element for non-Svelte applications.
- * All `OpenSeahorse` props are passed through and can be updated at any time via `update()`.
+ * Mounts a `DziViewer` into any DOM element for non-Svelte applications.
+ * All `DziViewer` props are passed through and can be updated at any time via `update()`.
  */
-export function createOpenSeahorse(
+export function createDziViewer(
 	target: HTMLElement,
-	options: VanillaOpenSeahorseOptions
-): OpenSeahorseController {
-	return createController(OpenSeahorse, target, options);
+	options: VanillaDziViewerOptions
+): DziViewerController {
+	return createController(DziViewer, target, options);
 }
 
 /**
  * Mounts an interactive `PanZoom` viewer into any DOM element for non-Svelte applications.
- * All `PanZoom` and `OpenSeahorse` props are passed through and can be updated via `update()`.
+ * All `PanZoom` and `DziViewer` props are passed through and can be updated via `update()`.
  */
 export function createPanZoom(
 	target: HTMLElement,

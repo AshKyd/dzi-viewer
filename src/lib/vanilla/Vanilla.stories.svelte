@@ -6,7 +6,7 @@
 	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
-		title: 'OpenSeahorse/Vanilla Non-Svelte API',
+		title: 'DziViewer/Vanilla Non-Svelte API',
 		component: VanillaDemo,
 		tags: ['autodocs'],
 		argTypes: {
@@ -57,7 +57,7 @@
 />
 
 <Story
-	name="Vanilla OpenSeahorse Viewer"
+	name="Vanilla DziViewer"
 	args={{
 		mode: 'viewer',
 		source: ABC_SCAM_DZI,

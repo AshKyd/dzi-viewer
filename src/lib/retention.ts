@@ -16,7 +16,7 @@ const COVERAGE_EPSILON = 1e-6;
 export const LAYER_ORIGIN_CHUNK_SIZE = 2048;
 
 /**
- * Computes a chunk-aligned local origin in level pixels so mounted `.osh-tile` coordinates
+ * Computes a chunk-aligned local origin in level pixels so mounted `.dzi-tile` coordinates
  * remain close to `(0, 0)` even when viewing deep corners of very large DZI pyramids.
  */
 export function computeLayerOrigin(

@@ -1,8 +1,8 @@
-export { createOpenSeahorse, createPanZoom } from './createViewer.svelte.js';
+export { createDziViewer, createPanZoom } from './createViewer.svelte.js';
 export type {
-	OpenSeahorseController,
+	DziViewerController,
 	PanZoomController,
-	VanillaOpenSeahorseOptions,
+	VanillaDziViewerOptions,
 	VanillaPanZoomOptions,
 	ViewerStateSnapshot
 } from './createViewer.svelte.js';

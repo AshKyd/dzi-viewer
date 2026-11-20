@@ -1,5 +1,5 @@
 import { untrack, type Component } from 'svelte';
-import type { OpenSeahorseMethods } from '../components/OpenSeahorse/openSeahorseTypes.js';
+import type { DziViewerMethods } from '../components/DziViewer/dziViewerTypes.js';
 import type { PanZoomProps } from '../components/PanZoom/panZoomTypes.js';
 import type { DziDescriptor, Size, Viewport } from '../types.js';
 import {
@@ -13,10 +13,10 @@ import {
 export type ViewerRestProps = Omit<PanZoomProps, BindableKey>;
 
 /**
- * A viewer the bridge can mount. `OpenSeahorse` fits too: its props are a subset of `PanZoom`'s,
+ * A viewer the bridge can mount. `DziViewer` fits too: its props are a subset of `PanZoom`'s,
  * and a component that accepts fewer props can always be given more.
  */
-export type ViewerComponent = Component<PanZoomProps, OpenSeahorseMethods, BindableKey>;
+export type ViewerComponent = Component<PanZoomProps, DziViewerMethods, BindableKey>;
 
 export type StateChangeListener = (state: ViewerStateSnapshot) => void;
 

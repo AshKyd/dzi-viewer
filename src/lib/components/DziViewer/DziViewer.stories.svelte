@@ -1,13 +1,13 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import OpenSeahorseDemo from './OpenSeahorseDemo.svelte';
+	import DziViewerDemo from './DziViewerDemo.svelte';
 
 	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
 	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
-		title: 'OpenSeahorse/Viewer',
-		component: OpenSeahorseDemo,
+		title: 'DziViewer/Viewer',
+		component: DziViewerDemo,
 		tags: ['autodocs'],
 		argTypes: {
 			panX: {

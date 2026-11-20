@@ -4,9 +4,9 @@
 	import type { PrecacheResult, Rect, Size, Viewport } from '../types.js';
 	import { resolveStageAndImageBounds } from '../viewport.js';
 	import {
-		createOpenSeahorse,
+		createDziViewer,
 		createPanZoom,
-		type OpenSeahorseController,
+		type DziViewerController,
 		type PanZoomController,
 		type ViewerStateSnapshot
 	} from './createViewer.svelte.js';
@@ -54,7 +54,7 @@
 	}: Props = $props();
 
 	let mountTarget: HTMLDivElement | undefined = $state();
-	let controller: OpenSeahorseController | PanZoomController | null = null;
+	let controller: DziViewerController | PanZoomController | null = null;
 	let snapshot = $state<ViewerStateSnapshot>({
 		x: 0,
 		y: 0,
@@ -68,7 +68,7 @@
 	let lastControlSignature = '';
 
 	function applyInitialOrControlViewport(
-		activeController: OpenSeahorseController | PanZoomController,
+		activeController: DziViewerController | PanZoomController,
 		currentState: ViewerStateSnapshot,
 		force: boolean
 	): void {
@@ -136,7 +136,7 @@
 						...initialOptions,
 						...untrack(() => ({ disabled, panEnabled, zoomEnabled }))
 					})
-				: createOpenSeahorse(target, initialOptions);
+				: createDziViewer(target, initialOptions);
 
 		controller = instance;
 		snapshot = instance.getState();

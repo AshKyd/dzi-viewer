@@ -3,7 +3,7 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 
 /**
- * Builds the standalone, framework-agnostic `openseahorse/vanilla` ESM entry point.
+ * Builds the standalone, framework-agnostic `dzi-viewer/vanilla` ESM entry point.
  * Bundles the minimal Svelte 5 client runtime and injects component CSS automatically
  * so non-Svelte projects (React, Vue, plain JS) require zero Svelte compiler plugins.
  */

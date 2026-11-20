@@ -1,12 +1,12 @@
 <script lang="ts">
-	import OpenSeahorseDemo from '#lib/components/OpenSeahorse/OpenSeahorseDemo.svelte';
+	import DziViewerDemo from '#lib/components/DziViewer/DziViewerDemo.svelte';
 
 	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
 </script>
 
 <main>
-	<h1>OpenSeahorse</h1>
-	<OpenSeahorseDemo source={VENICE_DZI} />
+	<h1>dzi-viewer</h1>
+	<DziViewerDemo source={VENICE_DZI} />
 </main>
 
 <style>

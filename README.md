@@ -1,15 +1,15 @@
-# OpenSeahorse
+# dzi-viewer
 
 A Deep Zoom (DZI) image viewer for Svelte 5. It loads only the tiles you can see, at the right resolution for the screen, and keeps lower-resolution tiles showing underneath while sharper ones load.
 
-- `OpenSeahorse` shows a DZI image at a given position and zoom. You control the viewport.
-- `PanZoom` wraps `OpenSeahorse` and adds drag, wheel, pinch, double-click and keyboard controls.
-- `openseahorse/vanilla` mounts either viewer in any page, without Svelte (plain JS, React, Vue).
+- `DziViewer` shows a DZI image at a given position and zoom. You control the viewport.
+- `PanZoom` wraps `DziViewer` and adds drag, wheel, pinch, double-click and keyboard controls.
+- `dzi-viewer/vanilla` mounts either viewer in any page, without Svelte (plain JS, React, Vue).
 
 ## Install
 
 ```bash
-npm install openseahorse
+npm install dzi-viewer
 ```
 
 Svelte 5 is a peer dependency for the Svelte components. The vanilla build bundles its own copy of the Svelte runtime.
@@ -20,9 +20,9 @@ Give the viewer a sized container. It fills its parent.
 
 ```svelte
 <script lang="ts">
-	import { PanZoom, type OpenSeahorseMethods } from 'openseahorse';
+	import { PanZoom, type DziViewerMethods } from 'dzi-viewer';
 
-	let viewer: OpenSeahorseMethods | undefined = $state();
+	let viewer: DziViewerMethods | undefined = $state();
 	let x = $state(0);
 	let y = $state(0);
 	let zoom = $state(1);
@@ -62,12 +62,12 @@ Coordinates:
 - `x` and `y` are the centre of the view, in stage units. By default one stage unit is one full-resolution image pixel.
 - `zoom` is how many CSS pixels one stage unit takes up. `zoom = 1` shows the image at full resolution.
 
-Use `OpenSeahorse` instead of `PanZoom` when you drive the viewport yourself, for example with a `Tween` or from scroll position.
+Use `DziViewer` instead of `PanZoom` when you drive the viewport yourself, for example with a `Tween` or from scroll position.
 
 ## Vanilla quick start
 
 ```js
-import { createPanZoom } from 'openseahorse/vanilla';
+import { createPanZoom } from 'dzi-viewer/vanilla';
 
 const viewer = createPanZoom(document.querySelector('#viewer'), {
 	source: '/images/photo.dzi',
@@ -80,7 +80,7 @@ viewer.update({ tileFadeDuration: 0 });
 viewer.destroy();
 ```
 
-- `createOpenSeahorse()` does the same without the pan and zoom controls.
+- `createDziViewer()` does the same without the pan and zoom controls.
 - `onStateChange` is called once per change made by the viewer: user gestures, resizes, and the DZI or tiles finishing loading.
 
 ## Sources
@@ -170,3 +170,13 @@ Run each of these from the project root:
 - `npm run check`: type check with `svelte-check`.
 - `npm run lint` / `npm run format`: Prettier and ESLint.
 - `npm run build`: builds the package into `dist/`, including the vanilla bundle.
+
+## Contributing
+
+This project was created with AI. Forks are welcome, but pull requests are only accepted in exceptional circumstances. You are welcome to open a [GitHub issue](https://github.com/AshKyd/dzi-viewer/issues), though it may not be actioned.
+
+This software is provided as-is, with no warranty or liability of any kind. See [LICENSE](./LICENSE) for the full ISC licence text.
+
+## Credits
+
+Inspired by [OpenSeadragon](https://openseadragon.github.io/). `dzi-viewer` was built from scratch as a smaller, faster DOM-based alternative for modern browsers, using standard `<img>` elements and GPU-composited CSS transforms instead of `<canvas>` or WebGL.

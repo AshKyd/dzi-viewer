@@ -35,7 +35,7 @@
 		screenToStage as convertScreenToStage,
 		stageToScreen as convertStageToScreen
 	} from '../../viewport.js';
-	import type { OpenSeahorseProps } from './openSeahorseTypes.js';
+	import type { DziViewerProps } from './dziViewerTypes.js';
 	import { attachTileImage } from './tileImageAction.js';
 
 	let {
@@ -65,7 +65,7 @@
 		onLoad,
 		onError,
 		onTileError
-	}: OpenSeahorseProps = $props();
+	}: DziViewerProps = $props();
 
 	let containerEl: HTMLDivElement | undefined = $state();
 	let cacheVersion = $state(0);
@@ -329,7 +329,7 @@
 		return `translate3d(${tx}px, ${ty}px, 0) scale(${scaleX}, ${scaleY})`;
 	}
 
-	// --- Exported methods (see `OpenSeahorseMethods`) ---
+	// --- Exported methods (see `DziViewerMethods`) ---
 
 	/**
 	 * Computes a viewport that fits `bounds` inside the current container (defaults to the loaded image's bounds).
@@ -423,13 +423,13 @@
 
 <div
 	bind:this={containerEl}
-	class="osh-viewport {className}"
+	class="dzi-viewport {className}"
 	role={alt ? 'img' : undefined}
 	aria-label={alt || undefined}
 >
 	{#each renderPlan.layers as layer (layer.level)}
 		<div
-			class="osh-level"
+			class="dzi-level"
 			data-level={layer.level}
 			data-optimal={layer.isOptimal ? 'true' : 'false'}
 			style:z-index={layer.zIndex}
@@ -437,7 +437,7 @@
 		>
 			{#each layer.tiles as tile (tile.key)}
 				<div
-					class="osh-tile"
+					class="dzi-tile"
 					style:left="{tile.pixelRect.x - layer.origin.x}px"
 					style:top="{tile.pixelRect.y - layer.origin.y}px"
 					style:width="{tile.pixelRect.width}px"
@@ -455,7 +455,7 @@
 </div>
 
 <style>
-	.osh-viewport {
+	.dzi-viewport {
 		position: relative;
 		overflow: hidden;
 		width: 100%;
@@ -463,7 +463,7 @@
 		contain: layout paint;
 	}
 
-	.osh-level {
+	.dzi-level {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -472,7 +472,7 @@
 		pointer-events: none;
 	}
 
-	.osh-tile {
+	.dzi-tile {
 		position: absolute;
 		overflow: hidden;
 		pointer-events: none;

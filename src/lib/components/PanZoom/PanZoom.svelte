@@ -11,8 +11,8 @@
 		ViewportFitOptions
 	} from '../../types.js';
 	import { clampViewport } from '../../viewport.js';
-	import OpenSeahorse from '../OpenSeahorse/OpenSeahorse.svelte';
-	import type { OpenSeahorseMethods } from '../OpenSeahorse/openSeahorseTypes.js';
+	import DziViewer from '../DziViewer/DziViewer.svelte';
+	import type { DziViewerMethods } from '../DziViewer/dziViewerTypes.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
 	import {
 		computePinchStep,
@@ -39,11 +39,11 @@
 		keyboardPanStep = 80,
 		keyboardZoomFactor = 1.25,
 		onInteract,
-		...seahorseProps
+		...viewerProps
 	}: PanZoomProps = $props();
 
 	let rootEl: HTMLDivElement | undefined = $state();
-	let viewer: OpenSeahorseMethods | undefined = $state();
+	let viewer: DziViewerMethods | undefined = $state();
 	let isDragging = $state(false);
 
 	// Pointer positions are gesture bookkeeping read only inside event handlers, so they need no reactivity.
@@ -80,7 +80,7 @@
 	});
 
 	/**
-	 * The viewport as currently drawn. `OpenSeahorse` renders `x/y/zoom` clamped by `constraints`, so gestures
+	 * The viewport as currently drawn. `DziViewer` renders `x/y/zoom` clamped by `constraints`, so gestures
 	 * must start from the clamped values too, or the first drag jumps when the bound values are out of range.
 	 */
 	function currentViewport(): Viewport {
@@ -330,12 +330,12 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div
 	bind:this={rootEl}
-	class="osh-panzoom {className}"
-	class:osh-panzoom-interactive={interactive}
-	class:osh-panzoom-pannable={canPan}
-	class:osh-panzoom-dragging={isDragging}
+	class="dzi-panzoom {className}"
+	class:dzi-panzoom-interactive={interactive}
+	class:dzi-panzoom-pannable={canPan}
+	class:dzi-panzoom-dragging={isDragging}
 	role="application"
-	aria-label={seahorseProps.alt || 'Interactive deep zoom image viewer'}
+	aria-label={viewerProps.alt || 'Interactive deep zoom image viewer'}
 	aria-disabled={disabled ? 'true' : undefined}
 	tabindex={keyboardEnabled && interactive ? 0 : undefined}
 	onpointerdown={handlePointerDown}
@@ -345,7 +345,7 @@
 	ondblclick={handleDoubleClick}
 	onkeydown={handleKeyDown}
 >
-	<OpenSeahorse
+	<DziViewer
 		bind:this={viewer}
 		bind:x
 		bind:y
@@ -354,12 +354,12 @@
 		bind:dzi
 		bind:isOptimalLoaded
 		{constraints}
-		{...seahorseProps}
+		{...viewerProps}
 	/>
 </div>
 
 <style>
-	.osh-panzoom {
+	.dzi-panzoom {
 		position: relative;
 		width: 100%;
 		height: 100%;
@@ -367,19 +367,19 @@
 		-webkit-user-select: none;
 	}
 
-	.osh-panzoom-interactive {
+	.dzi-panzoom-interactive {
 		touch-action: none;
 	}
 
-	.osh-panzoom-pannable {
+	.dzi-panzoom-pannable {
 		cursor: grab;
 	}
 
-	.osh-panzoom-dragging {
+	.dzi-panzoom-dragging {
 		cursor: grabbing;
 	}
 
-	.osh-panzoom:focus-visible {
+	.dzi-panzoom:focus-visible {
 		outline: 2px solid #3b82f6;
 		outline-offset: -2px;
 	}

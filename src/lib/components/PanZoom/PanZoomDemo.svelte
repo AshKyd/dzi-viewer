@@ -2,7 +2,7 @@
 	import { clampDpr, DEFAULT_MAX_DPR, getOptimalLevel } from '../../tiling.js';
 	import type { DziDescriptor, Rect, Size, Viewport, ViewportConstraints } from '../../types.js';
 	import { resolveStageAndImageBounds } from '../../viewport.js';
-	import type { OpenSeahorseMethods } from '../OpenSeahorse/openSeahorseTypes.js';
+	import type { DziViewerMethods } from '../DziViewer/dziViewerTypes.js';
 	import PanZoom from './PanZoom.svelte';
 
 	interface Props {
@@ -50,7 +50,7 @@
 		constrainToBounds = false
 	}: Props = $props();
 
-	let viewer: OpenSeahorseMethods | undefined = $state();
+	let viewer: DziViewerMethods | undefined = $state();
 	let x = $state(0);
 	let y = $state(0);
 	let zoom = $state(1);

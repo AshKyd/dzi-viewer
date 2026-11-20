@@ -1,19 +1,19 @@
 <script lang="ts">
-	import type { OpenSeahorseMethods } from '../components/OpenSeahorse/openSeahorseTypes.js';
+	import type { DziViewerMethods } from '../components/DziViewer/dziViewerTypes.js';
 	import type { ReactiveBridge, ViewerComponent } from './reactiveBridge.svelte.js';
 
 	interface Props {
-		/** Viewer to mount: `OpenSeahorse` or `PanZoom`. */
+		/** Viewer to mount: `DziViewer` or `PanZoom`. */
 		component: ViewerComponent;
 		/** Shared state written by the vanilla controller and read back from the viewer. */
 		bridge: ReactiveBridge;
 	}
 
 	let { component: Viewer, bridge }: Props = $props();
-	let viewer: OpenSeahorseMethods | undefined = $state();
+	let viewer: DziViewerMethods | undefined = $state();
 
 	/** The mounted viewer's methods, once it has mounted. */
-	export function getViewer(): OpenSeahorseMethods | undefined {
+	export function getViewer(): DziViewerMethods | undefined {
 		return viewer;
 	}
 </script>

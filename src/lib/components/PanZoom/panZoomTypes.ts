@@ -1,7 +1,7 @@
 import type { Viewport } from '../../types.js';
-import type { OpenSeahorseProps } from '../OpenSeahorse/openSeahorseTypes.js';
+import type { DziViewerProps } from '../DziViewer/dziViewerTypes.js';
 
-export interface PanZoomProps extends OpenSeahorseProps {
+export interface PanZoomProps extends DziViewerProps {
 	/** Disables all pointer, wheel, touch, and keyboard pan/zoom interactions. */
 	disabled?: boolean;
 	/** Enables pointer drag and touch panning. */

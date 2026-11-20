@@ -1,11 +1,11 @@
-export { default as OpenSeahorse } from './components/OpenSeahorse/OpenSeahorse.svelte';
+export { default as DziViewer } from './components/DziViewer/DziViewer.svelte';
 export { default as PanZoom } from './components/PanZoom/PanZoom.svelte';
 
-export { createOpenSeahorse, createPanZoom } from './vanilla/createViewer.svelte.js';
+export { createDziViewer, createPanZoom } from './vanilla/createViewer.svelte.js';
 export type {
-	OpenSeahorseController,
+	DziViewerController,
 	PanZoomController,
-	VanillaOpenSeahorseOptions,
+	VanillaDziViewerOptions,
 	VanillaPanZoomOptions,
 	ViewerStateSnapshot
 } from './vanilla/createViewer.svelte.js';
