@@ -74,8 +74,8 @@
 		}
 		const { imageBounds } = resolveStageAndImageBounds(dzi, stageSize);
 		return {
-			x: imageBounds.x + imageBounds.width * 0.35,
-			y: imageBounds.y + imageBounds.height * 0.3,
+			x: imageBounds.x + imageBounds.width * 0.375,
+			y: imageBounds.y + imageBounds.height * 0.55,
 			width: imageBounds.width * 0.25,
 			height: imageBounds.height * 0.25
 		};

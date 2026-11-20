@@ -1,12 +1,11 @@
 <script lang="ts">
 	import DziViewerDemo from '#lib/components/DziViewer/DziViewerDemo.svelte';
-
-	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
+	import { BEACH_DZI } from '../stories/exampleImages.js';
 </script>
 
 <main>
 	<h1>dzi-viewer</h1>
-	<DziViewerDemo source={VENICE_DZI} />
+	<DziViewerDemo source={BEACH_DZI} />
 </main>
 
 <style>

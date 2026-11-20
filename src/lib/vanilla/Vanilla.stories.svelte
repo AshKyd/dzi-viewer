@@ -1,9 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { BEACH_DZI, HARBOUR_DZI } from '../../stories/exampleImages.js';
 	import VanillaDemo from './VanillaDemo.svelte';
-
-	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
-	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
 		title: 'DziViewer/Vanilla Non-Svelte API',
@@ -51,7 +49,7 @@
 	name="Vanilla PanZoom"
 	args={{
 		mode: 'panzoom',
-		source: VENICE_DZI,
+		source: HARBOUR_DZI,
 		initialMode: 'fit'
 	}}
 />
@@ -60,7 +58,7 @@
 	name="Vanilla DziViewer"
 	args={{
 		mode: 'viewer',
-		source: ABC_SCAM_DZI,
+		source: BEACH_DZI,
 		initialMode: 'fill'
 	}}
 />

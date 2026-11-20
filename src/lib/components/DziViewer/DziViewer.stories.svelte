@@ -1,9 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { BEACH_DZI, CANAL_DZI, HARBOUR_DZI, PARK_DZI } from '../../../stories/exampleImages.js';
 	import DziViewerDemo from './DziViewerDemo.svelte';
-
-	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
-	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
 		title: 'DziViewer/Viewer',
@@ -41,25 +39,36 @@
 </script>
 
 <Story
-	name="Venice Fit and Tween"
+	name="Canal Fit and Tween"
 	args={{
-		source: VENICE_DZI,
+		source: CANAL_DZI,
 		initialMode: 'fit'
 	}}
 />
 
 <Story
-	name="ABC Scam Sites Fill Screen"
+	name="Harbour Fill Screen"
 	args={{
-		source: ABC_SCAM_DZI,
+		source: HARBOUR_DZI,
 		initialMode: 'fill'
+	}}
+/>
+
+<Story
+	name="Beach Zoomed In (8160px)"
+	args={{
+		source: BEACH_DZI,
+		initialMode: 'fit',
+		panX: 0.3,
+		panY: 0.5,
+		zoomFactor: 6
 	}}
 />
 
 <Story
 	name="Custom Virtual Stage 1000x1000"
 	args={{
-		source: VENICE_DZI,
+		source: PARK_DZI,
 		stageSize: { width: 1000, height: 1000 },
 		initialMode: 'fit'
 	}}

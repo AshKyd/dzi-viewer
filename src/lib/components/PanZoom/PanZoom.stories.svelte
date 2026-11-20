@@ -1,9 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { CANAL_DZI, PARK_DZI } from '../../../stories/exampleImages.js';
 	import PanZoomDemo from './PanZoomDemo.svelte';
-
-	const VENICE_DZI = '/dzi/kithandkinhero.dzi';
-	const ABC_SCAM_DZI = '/dzi/fake-abc-sites2.dzi';
 
 	const { Story } = defineMeta({
 		title: 'DziViewer/PanZoom',
@@ -49,17 +47,17 @@
 </script>
 
 <Story
-	name="Venice Interactive"
+	name="Lakeside Park Interactive (8160px)"
 	args={{
-		source: VENICE_DZI,
+		source: PARK_DZI,
 		initialMode: 'fit'
 	}}
 />
 
 <Story
-	name="ABC Scam Sites Constrained"
+	name="Canal Constrained"
 	args={{
-		source: ABC_SCAM_DZI,
+		source: CANAL_DZI,
 		initialMode: 'fill',
 		constrainToBounds: true
 	}}
