@@ -4,6 +4,7 @@ import {
 	computeLayerOrigin,
 	computeRenderPlan,
 	LAYER_ORIGIN_CHUNK_SIZE,
+	mergeAdjacentRects,
 	subtractRect
 } from './retention.js';
 import { TileCache } from './tileCache.js';
@@ -26,6 +27,31 @@ describe('coverage subtraction and zero-blank fallback retention', () => {
 		);
 		const totalArea = remaining.reduce((sum, rect) => sum + rect.width * rect.height, 0);
 		expect(totalArea).toBeCloseTo(100 * 100 - 50 * 50);
+	});
+
+	it('merges a grid of touching rectangles into one, and leaves separate ones alone', () => {
+		const grid = [0, 1, 2].flatMap((row) =>
+			[0, 1, 2].map((col) => ({ x: col * 10, y: row * 10, width: 10, height: 10 }))
+		);
+		const apart = { x: 50, y: 0, width: 10, height: 10 };
+
+		expect(mergeAdjacentRects([...grid.reverse(), apart])).toEqual([
+			{ x: 0, y: 0, width: 30, height: 30 },
+			apart
+		]);
+	});
+
+	it('keeps an L-shape as two rectangles covering the same area', () => {
+		const lShape = [
+			{ x: 0, y: 0, width: 10, height: 10 },
+			{ x: 10, y: 0, width: 10, height: 10 },
+			{ x: 0, y: 10, width: 10, height: 10 }
+		];
+		const merged = mergeAdjacentRects(lShape);
+		const area = merged.reduce((sum, rect) => sum + rect.width * rect.height, 0);
+
+		expect(merged).toHaveLength(2);
+		expect(area).toBe(300);
 	});
 
 	it('retains coarser under-zoom fallback tiles until 100% of optimal tiles are decoded', () => {
@@ -224,5 +250,41 @@ describe('coverage subtraction and zero-blank fallback retention', () => {
 		});
 
 		expect(computeLayerOrigin([])).toEqual({ x: 0, y: 0 });
+	});
+
+	it('keeps tiles in grid order while the viewport pans, so DOM nodes never need reordering', () => {
+		const cache = new TileCache();
+		const viewportAt = (x: number) =>
+			getTilesForViewport({
+				dzi: DZI,
+				imageBounds: IMAGE_BOUNDS,
+				viewport: { x, y: 512, zoom: 1 },
+				containerSize: { width: 512, height: 512 },
+				levelOverride: 10
+			});
+
+		const left = viewportAt(400);
+		const right = viewportAt(624);
+		[...left.tiles, ...right.tiles].forEach((spec) => cache.setReady(spec));
+
+		const tileKeysFor = (selection: ReturnType<typeof viewportAt>) =>
+			computeRenderPlan({
+				dzi: DZI,
+				optimalLevel: 10,
+				optimalTiles: selection.tiles,
+				visibleBounds: selection.visibleBounds,
+				cache
+			}).layers.flatMap((layer) => layer.tiles.map((tile) => tile.key));
+
+		// The loader's centre-out order differs between the two viewports...
+		expect(left.tiles.map((tile) => tile.key)).not.toEqual(
+			right.tiles.map((tile) => tile.key).filter((key) => left.tiles.some((t) => t.key === key))
+		);
+		// ...but tiles both viewports share keep the same relative order in the render plan.
+		const leftKeys = tileKeysFor(left);
+		const rightKeys = tileKeysFor(right);
+		const shared = leftKeys.filter((key) => rightKeys.includes(key));
+		expect(shared.length).toBeGreaterThan(1);
+		expect(rightKeys.filter((key) => shared.includes(key))).toEqual(shared);
 	});
 });

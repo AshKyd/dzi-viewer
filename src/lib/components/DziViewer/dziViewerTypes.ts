@@ -55,6 +55,11 @@ export interface DziViewerProps {
 	preloadBaseLevel?: boolean;
 	/** Fade-in and crossfade duration for loaded tiles in milliseconds (`0` disables fading). */
 	tileFadeDuration?: number;
+	/**
+	 * Most new tiles added to the DOM per animation frame (defaults to `8`; removals get twice this).
+	 * The rest wait for later frames while coarser tiles keep showing. `Infinity` turns the limit off.
+	 */
+	maxTileMountsPerFrame?: number;
 	/** Optional CORS attribute applied to tile images. */
 	crossOrigin?: '' | 'anonymous' | 'use-credentials';
 	/** Optional custom tile URL builder overriding the default DZI `{level}/{col}_{row}.{format}` pattern. */
@@ -96,4 +101,15 @@ export interface DziViewerMethods {
 	/** Starts downloading viewport tiles again after `pauseLoading()`. */
 	resumeLoading(): void;
 	isLoadingPaused(): boolean;
+	/**
+	 * Stops the viewer switching to a sharper pyramid level, e.g. during a zoom animation, so it doesn't
+	 * mount a new set of tiles at every level it passes through. Zooming in shows the held level enlarged;
+	 * zooming out still drops to coarser levels so tile counts stay low. Independent of `pauseLoading()`:
+	 * downloads for the held level continue unless loading is also paused.
+	 * Does nothing until a DZI has loaded and the container has a size.
+	 */
+	holdResolution(): void;
+	/** Lets the viewer pick the best level for the current zoom again after `holdResolution()`. */
+	releaseResolution(): void;
+	isResolutionHeld(): boolean;
 }

@@ -103,6 +103,7 @@ All props are optional except `source`.
 - `maxDpr` (default `1.5`): caps the device pixel ratio used to pick tile resolution. Lower values load fewer tiles.
 - `quality` (default `1`): multiplies the resolution chosen. Use `0.5` for faster, softer images.
 - `tileFadeDuration` (default `200`): tile fade-in in milliseconds. `0` turns fading off.
+- `maxTileMountsPerFrame` (default `8`): most new tiles added to the page per frame. Removals get twice this. When a zoom lands and a whole level swaps in, the rest wait for later frames while coarser tiles keep showing. `Infinity` turns the limit off.
 - `maxConcurrentLoads` (default `16`): tile downloads in flight at once. Suits HTTP/2 and HTTP/3 servers. Over HTTP/1.1 the browser queues anything past about 6 per host, so lower this if the server only speaks HTTP/1.1.
 - `maxCachedTiles` (default `256`): how many decoded tiles to keep in memory.
 - `maxRetries` (default `1`): immediate retries for a failed tile request.
@@ -124,6 +125,7 @@ Available through `bind:this` on either component, and on the vanilla controller
 - `precacheBounds(bounds, 'fit' | 'fill', options?)`: the same, for a fit or fill view of `bounds`.
 - `stageToScreen(point)` / `screenToStage(point)`: convert between stage coordinates and container pixels.
 - `pauseLoading()` / `resumeLoading()` / `isLoadingPaused()`: stop and restart downloading tiles for the current view. See below.
+- `holdResolution()` / `releaseResolution()` / `isResolutionHeld()`: stop and restart switching to sharper pyramid levels. See below.
 
 The vanilla controller also has `update`, `setViewport`, `getViewport`, `getState` and `destroy`.
 
@@ -159,6 +161,30 @@ function handleInteract() {
 ```
 
 Pass `handleInteract` as `PanZoom`'s `onInteract` prop.
+
+## Holding the resolution
+
+As you zoom, the viewer switches to the pyramid level that matches the new scale, and every switch mounts a new set of tiles. During a fast zoom it can pass through several levels in under a second. `holdResolution()` keeps the current level until `releaseResolution()`:
+
+- Zooming in shows the held level enlarged (softer) instead of mounting sharper tiles.
+- Zooming out still switches to coarser levels, so the number of tiles stays low.
+- Tile downloads for the held level carry on, unless loading is also paused.
+
+Holding and pausing are separate, so you can combine them:
+
+- **Pause only:** no downloads, but in-between zoom levels still show from tiles already downloaded.
+- **Hold only:** no level switching, but tiles for the held level keep downloading.
+- **Both:** the cheapest option for animations.
+
+```ts
+const target = viewer.getFitViewport(detailBounds);
+viewer.pauseLoading();
+viewer.holdResolution();
+void viewer.precacheViewport(target);
+await Promise.all([tweenX.set(target.x), tweenY.set(target.y), tweenZoom.set(target.zoom)]);
+viewer.releaseResolution();
+viewer.resumeLoading();
+```
 
 ## Development
 

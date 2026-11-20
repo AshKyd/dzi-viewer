@@ -1,6 +1,6 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { BEACH_DZI, HARBOUR_DZI } from '../../stories/exampleImages.js';
+	import { NOOSA_BEACH_DZI, BARCELONA_HARBOUR_DZI } from '../../stories/exampleImages.js';
 	import VanillaDemo from './VanillaDemo.svelte';
 
 	const { Story } = defineMeta({
@@ -49,7 +49,7 @@
 	name="Vanilla PanZoom"
 	args={{
 		mode: 'panzoom',
-		source: HARBOUR_DZI,
+		source: BARCELONA_HARBOUR_DZI,
 		initialMode: 'fit'
 	}}
 />
@@ -58,7 +58,7 @@
 	name="Vanilla DziViewer"
 	args={{
 		mode: 'viewer',
-		source: BEACH_DZI,
+		source: NOOSA_BEACH_DZI,
 		initialMode: 'fill'
 	}}
 />

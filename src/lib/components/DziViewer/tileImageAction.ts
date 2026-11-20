@@ -3,10 +3,8 @@ import type { CachedTile } from '../../types.js';
 
 export interface AttachTileImageParams {
 	readonly tile: CachedTile;
-	/** Fade-in duration in milliseconds; `0` mounts immediately at full opacity. */
-	readonly fadeDuration: number;
-	/** Called once the tile reaches full opacity so underlying fallback tiles can be removed. */
-	readonly onOpaque: (key: string) => void;
+	/** Called once the tile's image is in the DOM. */
+	readonly onMount: (key: string) => void;
 	/** Called when the tile slot unmounts so re-mounting it later fades in cleanly. */
 	readonly onUnmount: (key: string) => void;
 }
@@ -32,9 +30,10 @@ function getTileImage(tile: CachedTile): HTMLImageElement {
 }
 
 /**
- * Mounts an already-decoded `HTMLImageElement` from `TileCache` directly into its DOM slot
- * and fades it in on the compositor thread before signalling opacity completion.
+ * Mounts an already-decoded `HTMLImageElement` from `TileCache` directly into its DOM slot.
  *
+ * The fade-in is a CSS animation on the slot (see `.dzi-tile-fade` in `DziViewer.svelte`), and the viewer
+ * listens for its `animationend` once at the root, so this action creates no animations or listeners.
  * The parent `{#each}` is keyed by `tile.key`, so one action instance always shows the same tile.
  */
 export function attachTileImage(
@@ -44,7 +43,6 @@ export function attachTileImage(
 	const { key } = params.tile;
 	let latestParams = params;
 	let mountedImage: HTMLImageElement | null = null;
-	let destroyed = false;
 
 	const mountImage = (tile: CachedTile) => {
 		if (mountedImage?.parentNode === node && (!tile.image || mountedImage === tile.image)) {
@@ -58,31 +56,8 @@ export function attachTileImage(
 		node.appendChild(mountedImage);
 	};
 
-	const signalOpaque = () => {
-		if (!destroyed) {
-			latestParams.onOpaque(key);
-		}
-	};
-
 	mountImage(params.tile);
-
-	// --- Fade in ---
-	// Reduced motion keeps the fade: it's an opacity change, not movement.
-	const canAnimate = params.fadeDuration > 0 && typeof node.animate === 'function';
-	const animation = canAnimate
-		? node.animate([{ opacity: 0 }, { opacity: 1 }], {
-				duration: params.fadeDuration,
-				easing: 'ease-out'
-			})
-		: null;
-
-	if (animation) {
-		animation.finished.then(signalOpaque).catch(() => {
-			// Expected when a tile unmounts mid-fade and cancels its animation.
-		});
-	} else {
-		queueMicrotask(signalOpaque);
-	}
+	params.onMount(key);
 
 	return {
 		update(nextParams: AttachTileImageParams) {
@@ -90,8 +65,6 @@ export function attachTileImage(
 			mountImage(nextParams.tile);
 		},
 		destroy() {
-			destroyed = true;
-			animation?.cancel();
 			// Only remove the image if it's still ours; it may have moved to another slot already.
 			if (mountedImage?.parentNode === node) {
 				mountedImage.remove();

@@ -10,6 +10,11 @@ export interface TileCacheOptions {
  */
 export class TileCache {
 	readonly #entries = new Map<string, CachedTile>();
+	/**
+	 * Ready tiles grouped by pyramid level. The render plan needs this every frame to find fallback tiles,
+	 * so it's kept up to date on every status change instead of scanning and grouping the whole cache.
+	 */
+	readonly #readyByLevel = new Map<number, Set<CachedTile>>();
 	#maxCachedTiles: number;
 	#tick = 0;
 
@@ -38,7 +43,11 @@ export class TileCache {
 	}
 
 	delete(key: string): void {
-		this.#entries.delete(key);
+		const entry = this.#entries.get(key);
+		if (entry) {
+			this.#removeFromReadyIndex(entry);
+			this.#entries.delete(key);
+		}
 	}
 
 	touch(key: string): void {
@@ -56,6 +65,7 @@ export class TileCache {
 			existing.status = status;
 			existing.stageRect = spec.stageRect;
 			existing.lastUsed = this.#tick;
+			this.#updateReadyIndex(existing);
 			return existing;
 		}
 
@@ -71,6 +81,7 @@ export class TileCache {
 			lastUsed: this.#tick
 		};
 		this.#entries.set(spec.key, created);
+		this.#updateReadyIndex(created);
 		return created;
 	}
 
@@ -90,7 +101,12 @@ export class TileCache {
 	}
 
 	getReadyTiles(): CachedTile[] {
-		return Array.from(this.#entries.values()).filter((entry) => entry.status === 'ready');
+		return Array.from(this.#readyByLevel.values()).flatMap((tiles) => Array.from(tiles));
+	}
+
+	/** Ready tiles grouped by pyramid level. Levels with no ready tiles are left out. */
+	getReadyTilesByLevel(): ReadonlyMap<number, ReadonlySet<CachedTile>> {
+		return this.#readyByLevel;
 	}
 
 	evict(protectedKeys: ReadonlySet<string>): number {
@@ -104,9 +120,7 @@ export class TileCache {
 			.sort((a, b) => a.lastUsed - b.lastUsed)
 			.slice(0, excess);
 
-		candidates.forEach((entry) => {
-			this.#entries.delete(entry.key);
-		});
+		candidates.forEach((entry) => this.delete(entry.key));
 
 		return candidates.length;
 	}
@@ -119,6 +133,30 @@ export class TileCache {
 
 	clear(): void {
 		this.#entries.clear();
+		this.#readyByLevel.clear();
 		this.#tick = 0;
+	}
+
+	// --- Ready index ---
+
+	#updateReadyIndex(entry: CachedTile): void {
+		if (entry.status !== 'ready') {
+			this.#removeFromReadyIndex(entry);
+			return;
+		}
+		const levelTiles = this.#readyByLevel.get(entry.level) ?? new Set<CachedTile>();
+		levelTiles.add(entry);
+		this.#readyByLevel.set(entry.level, levelTiles);
+	}
+
+	#removeFromReadyIndex(entry: CachedTile): void {
+		const levelTiles = this.#readyByLevel.get(entry.level);
+		if (!levelTiles) {
+			return;
+		}
+		levelTiles.delete(entry);
+		if (levelTiles.size === 0) {
+			this.#readyByLevel.delete(entry.level);
+		}
 	}
 }

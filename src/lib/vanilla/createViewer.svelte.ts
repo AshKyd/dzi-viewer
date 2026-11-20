@@ -1,9 +1,6 @@
 import { mount, unmount } from 'svelte';
 import DziViewer from '../components/DziViewer/DziViewer.svelte';
-import type {
-	DziViewerMethods,
-	DziViewerProps
-} from '../components/DziViewer/dziViewerTypes.js';
+import type { DziViewerMethods, DziViewerProps } from '../components/DziViewer/dziViewerTypes.js';
 import PanZoom from '../components/PanZoom/PanZoom.svelte';
 import type { PanZoomProps } from '../components/PanZoom/panZoomTypes.js';
 import { EMPTY_PRECACHE_RESULT } from '../precache.js';
@@ -94,6 +91,9 @@ function createController(
 		pauseLoading: () => viewer()?.pauseLoading(),
 		resumeLoading: () => viewer()?.resumeLoading(),
 		isLoadingPaused: () => viewer()?.isLoadingPaused() ?? false,
+		holdResolution: () => viewer()?.holdResolution(),
+		releaseResolution: () => viewer()?.releaseResolution(),
+		isResolutionHeld: () => viewer()?.isResolutionHeld() ?? false,
 		destroy() {
 			if (!mounted) {
 				return;

@@ -1,6 +1,6 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { CANAL_DZI, PARK_DZI } from '../../../stories/exampleImages.js';
+	import { HERENGRACHT_DZI, ROMA_STREET_PARKLANDS_DZI } from '../../../stories/exampleImages.js';
 	import PanZoomDemo from './PanZoomDemo.svelte';
 
 	const { Story } = defineMeta({
@@ -26,6 +26,9 @@
 			tileFadeDuration: {
 				control: { type: 'range', min: 0, max: 1500, step: 50 }
 			},
+			maxTileMountsPerFrame: {
+				control: { type: 'range', min: 1, max: 64, step: 1 }
+			},
 			initialMode: {
 				control: { type: 'inline-radio' },
 				options: ['fit', 'fill']
@@ -41,23 +44,26 @@
 			wheelZoomFactor: 1.2,
 			maxDpr: 1.5,
 			tileFadeDuration: 200,
-			constrainToBounds: false
+			maxTileMountsPerFrame: 8,
+			constrainToBounds: false,
+			pauseWhileInteracting: true,
+			holdResolutionWhileInteracting: true
 		}
 	});
 </script>
 
 <Story
-	name="Lakeside Park Interactive (8160px)"
+	name="Roma Street Parklands Interactive (8160px)"
 	args={{
-		source: PARK_DZI,
+		source: ROMA_STREET_PARKLANDS_DZI,
 		initialMode: 'fit'
 	}}
 />
 
 <Story
-	name="Canal Constrained"
+	name="Herengracht Constrained"
 	args={{
-		source: CANAL_DZI,
+		source: HERENGRACHT_DZI,
 		initialMode: 'fill',
 		constrainToBounds: true
 	}}

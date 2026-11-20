@@ -24,6 +24,12 @@
 		maxDpr?: number;
 		/** Fade-in and crossfade duration for loaded tiles in milliseconds. */
 		tileFadeDuration?: number;
+		/** Most new tiles mounted per animation frame. */
+		maxTileMountsPerFrame?: number;
+		/** Pause tile downloads while a tween runs, precaching only the destination. */
+		pauseWhileAnimating?: boolean;
+		/** Hold the current resolution level while a tween runs, so tiles aren't remounted at every level. */
+		holdResolutionWhileAnimating?: boolean;
 	}
 
 	let {
@@ -34,7 +40,10 @@
 		panY = 0.5,
 		zoomFactor = 1,
 		maxDpr = DEFAULT_MAX_DPR,
-		tileFadeDuration = 200
+		tileFadeDuration = 200,
+		maxTileMountsPerFrame,
+		pauseWhileAnimating = true,
+		holdResolutionWhileAnimating = true
 	}: Props = $props();
 
 	let viewer: DziViewerMethods | undefined = $state();
@@ -49,23 +58,56 @@
 	const tweenY = new Tween(0, { duration: 650, easing: cubicInOut });
 	const tweenZoom = new Tween(1, { duration: 650, easing: cubicInOut });
 
-	const currentLevel = $derived.by(() => {
+	// The status line reads the tween's target, not `current`, so it only re-renders when a move starts.
+	const targetLevel = $derived.by(() => {
 		if (!dzi) {
 			return null;
 		}
 		const { imageBounds } = resolveStageAndImageBounds(dzi, stageSize);
 		const deviceDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-		return getOptimalLevel(dzi, imageBounds, tweenZoom.current, clampDpr(deviceDpr, maxDpr));
+		return getOptimalLevel(dzi, imageBounds, tweenZoom.target, clampDpr(deviceDpr, maxDpr));
 	});
 
-	function moveTo(viewport: Viewport | null, immediate = false): void {
+	/** Increments per move, so only the latest tween resumes loading and releases the resolution. */
+	let animationId = 0;
+
+	/**
+	 * Tweens to `viewport`. While it runs, optionally pauses downloads (precaching only the destination)
+	 * and holds the resolution level, then restores both once the latest tween finishes.
+	 */
+	async function moveTo(viewport: Viewport | null, immediate = false): Promise<void> {
 		if (!viewport) {
 			return;
 		}
-		const options = immediate ? { duration: 0 } : undefined;
-		void tweenX.set(viewport.x, options);
-		void tweenY.set(viewport.y, options);
-		void tweenZoom.set(viewport.zoom, options);
+		if (immediate) {
+			await Promise.all([
+				tweenX.set(viewport.x, { duration: 0 }),
+				tweenY.set(viewport.y, { duration: 0 }),
+				tweenZoom.set(viewport.zoom, { duration: 0 })
+			]);
+			return;
+		}
+
+		const currentAnimationId = ++animationId;
+		if (pauseWhileAnimating) {
+			viewer?.pauseLoading();
+			void viewer?.precacheViewport(viewport);
+		}
+		if (holdResolutionWhileAnimating) {
+			viewer?.holdResolution();
+		}
+
+		// An interrupted tween's promise may never settle; the newer move restores the viewer instead.
+		await Promise.all([
+			tweenX.set(viewport.x),
+			tweenY.set(viewport.y),
+			tweenZoom.set(viewport.zoom)
+		]);
+		if (currentAnimationId !== animationId) {
+			return;
+		}
+		viewer?.releaseResolution();
+		viewer?.resumeLoading();
 	}
 
 	function getDetailBounds(): Rect | undefined {
@@ -120,7 +162,7 @@
 		}
 
 		const { imageBounds } = resolveStageAndImageBounds(dzi, stageSize);
-		moveTo(
+		void moveTo(
 			{
 				x: imageBounds.x + panX * imageBounds.width,
 				y: imageBounds.y + panY * imageBounds.height,
@@ -146,23 +188,29 @@
 
 <div class="demo-shell">
 	<div class="demo-toolbar">
-		<button type="button" onclick={() => moveTo(viewer?.getFitViewport() ?? null)}>
+		<button type="button" onclick={() => void moveTo(viewer?.getFitViewport() ?? null)}>
 			Fit image
 		</button>
-		<button type="button" onclick={() => moveTo(viewer?.getFillViewport() ?? null)}>
+		<button type="button" onclick={() => void moveTo(viewer?.getFillViewport() ?? null)}>
 			Fill screen
 		</button>
-		<button type="button" onclick={() => moveTo(viewer?.getFitViewport(getDetailBounds()) ?? null)}>
+		<button
+			type="button"
+			onclick={() => void moveTo(viewer?.getFitViewport(getDetailBounds()) ?? null)}
+		>
 			Tween to detail
 		</button>
-		<button type="button" onclick={() => moveTo(viewer?.getFitViewport(getCornerBounds()) ?? null)}>
+		<button
+			type="button"
+			onclick={() => void moveTo(viewer?.getFitViewport(getCornerBounds()) ?? null)}
+		>
 			Tween to corner
 		</button>
 		<button type="button" onclick={() => void handlePrecacheDetail()}> Pre-cache detail </button>
 		<span class="demo-status">
 			{#if dzi}
-				{dzi.width}×{dzi.height} | L{currentLevel ?? '-'} | maxDpr {maxDpr} | zoom
-				{tweenZoom.current.toFixed(3)} |
+				{dzi.width}×{dzi.height} | target L{targetLevel ?? '-'} | maxDpr {maxDpr} | target zoom
+				{tweenZoom.target.toFixed(3)} |
 				{isOptimalLoaded ? 'Optimal loaded' : 'Loading tiles...'}
 			{:else}
 				Loading DZI...
@@ -180,6 +228,7 @@
 			{stageSize}
 			{maxDpr}
 			{tileFadeDuration}
+			{maxTileMountsPerFrame}
 			x={tweenX.current}
 			y={tweenY.current}
 			zoom={tweenZoom.current}

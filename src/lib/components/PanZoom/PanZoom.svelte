@@ -321,6 +321,18 @@
 	export function isLoadingPaused(): boolean {
 		return viewer?.isLoadingPaused() ?? false;
 	}
+
+	export function holdResolution(): void {
+		viewer?.holdResolution();
+	}
+
+	export function releaseResolution(): void {
+		viewer?.releaseResolution();
+	}
+
+	export function isResolutionHeld(): boolean {
+		return viewer?.isResolutionHeld() ?? false;
+	}
 </script>
 
 <!--

@@ -71,6 +71,40 @@ describe('optimal level selection and tile culling', () => {
 		expect(distances).toEqual(sortedDistances);
 	});
 
+	it('caps the level at maxLevel when zooming in, but still drops lower when zooming out', () => {
+		const viewAtZoom = (zoom: number) =>
+			getTilesForViewport({
+				dzi: SAMPLE_DZI,
+				imageBounds,
+				viewport: { x: 2048, y: 2048, zoom },
+				containerSize: { width: 512, height: 512 },
+				dpr: 1,
+				maxLevel: 10
+			});
+
+		// Zoom 1 would pick level 12; the hold keeps it at 10.
+		expect(viewAtZoom(1).level).toBe(10);
+		// Zoom 0.125 picks level 9 on its own, below the cap.
+		expect(viewAtZoom(0.125).level).toBe(9);
+	});
+
+	it('returns the same tile details for repeated frames, with only distance recalculated', () => {
+		const frame = (x: number) =>
+			getTilesForViewport({
+				dzi: SAMPLE_DZI,
+				imageBounds,
+				viewport: { x, y: 512, zoom: 1 },
+				containerSize: { width: 512, height: 512 },
+				dpr: 1
+			});
+		const first = frame(512).tiles.find((t) => t.key === 'default:12:1_1');
+		const second = frame(520).tiles.find((t) => t.key === 'default:12:1_1');
+
+		expect(second?.pixelRect).toBe(first?.pixelRect);
+		expect(second?.stageRect).toBe(first?.stageRect);
+		expect(second?.distanceSq).not.toBe(first?.distanceSq);
+	});
+
 	it('returns an empty tile list when the viewport is completely outside imageBounds', () => {
 		const result = getTilesForViewport({
 			dzi: SAMPLE_DZI,

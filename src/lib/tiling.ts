@@ -56,6 +56,11 @@ export interface ViewportTilesParams {
 	readonly quality?: number;
 	readonly sourceId?: string;
 	readonly levelOverride?: number;
+	/**
+	 * Highest pyramid level to use. The optimal level is capped to this but may still go lower,
+	 * so zooming out keeps tile counts down. Used to hold the resolution during animations.
+	 */
+	readonly maxLevel?: number;
 }
 
 export interface ViewportTilesResult {
@@ -77,14 +82,15 @@ export function getTilesForViewport({
 	maxDpr = DEFAULT_MAX_DPR,
 	quality = 1,
 	sourceId = 'default',
-	levelOverride
+	levelOverride,
+	maxLevel = Number.POSITIVE_INFINITY
 }: ViewportTilesParams): ViewportTilesResult {
 	const visibleBounds = getViewportBounds(viewport, containerSize);
 	const effectiveDpr = clampDpr(dpr, maxDpr) * quality;
-	const level =
-		levelOverride !== undefined
-			? Math.min(dzi.maxLevel, Math.max(dzi.minLevel, levelOverride))
-			: getOptimalLevel(dzi, imageBounds, viewport.zoom, effectiveDpr);
+	const requestedLevel =
+		levelOverride ??
+		Math.min(maxLevel, getOptimalLevel(dzi, imageBounds, viewport.zoom, effectiveDpr));
+	const level = Math.min(dzi.maxLevel, Math.max(dzi.minLevel, requestedLevel));
 
 	if (imageBounds.width <= 0 || imageBounds.height <= 0) {
 		return { level, visibleBounds, tiles: [] };
@@ -137,7 +143,36 @@ export function getTilesForViewport({
 	return { level, visibleBounds, tiles };
 }
 
-/** Builds the `TileSpec` for one tile coordinate, with `distanceSq` of 0. */
+// --- Tile spec cache ---
+
+/** Per-descriptor cache of tile specs, valid for one `imageBounds` placement. */
+interface TileSpecCache {
+	readonly boundsKey: string;
+	readonly specs: Map<string, TileSpec>;
+}
+
+/** Caps memory for very large images: the cache just starts over once it holds this many specs. */
+const MAX_CACHED_TILE_SPECS = 4096;
+
+const tileSpecCaches = new WeakMap<DziDescriptor, TileSpecCache>();
+
+/**
+ * A tile's key, URL and rectangles never change while the descriptor and image placement stay the same,
+ * but they were rebuilt for every visible tile on every animation frame. This keeps them per descriptor
+ * and resets when `imageBounds` changes.
+ */
+function getTileSpecCache(dzi: DziDescriptor, imageBounds: Rect): Map<string, TileSpec> {
+	const boundsKey = `${imageBounds.x},${imageBounds.y},${imageBounds.width},${imageBounds.height}`;
+	const existing = tileSpecCaches.get(dzi);
+	if (existing?.boundsKey === boundsKey && existing.specs.size < MAX_CACHED_TILE_SPECS) {
+		return existing.specs;
+	}
+	const specs = new Map<string, TileSpec>();
+	tileSpecCaches.set(dzi, { boundsKey, specs });
+	return specs;
+}
+
+/** Returns the `TileSpec` for one tile coordinate, with `distanceSq` of 0. */
 function buildTileSpec(
 	dzi: DziDescriptor,
 	imageBounds: Rect,
@@ -146,8 +181,15 @@ function buildTileSpec(
 	row: number,
 	sourceId: string
 ): TileSpec {
-	return {
-		key: makeTileKey(sourceId, level, col, row),
+	const specs = getTileSpecCache(dzi, imageBounds);
+	const key = makeTileKey(sourceId, level, col, row);
+	const cached = specs.get(key);
+	if (cached) {
+		return cached;
+	}
+
+	const spec: TileSpec = {
+		key,
 		level,
 		col,
 		row,
@@ -156,6 +198,8 @@ function buildTileSpec(
 		stageRect: getTileStageRect(dzi, level, col, row, imageBounds),
 		distanceSq: 0
 	};
+	specs.set(key, spec);
+	return spec;
 }
 
 /**

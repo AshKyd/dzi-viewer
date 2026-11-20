@@ -30,8 +30,14 @@
 		maxDpr?: number;
 		/** Fade-in and crossfade duration in milliseconds. */
 		tileFadeDuration?: number;
+		/** Most new tiles mounted per animation frame. */
+		maxTileMountsPerFrame?: number;
 		/** Clamps pan/zoom within the loaded image bounds. */
 		constrainToBounds?: boolean;
+		/** Pause tile downloads while the user drags or zooms, resuming shortly after they stop. */
+		pauseWhileInteracting?: boolean;
+		/** Hold the resolution level while the user drags or zooms, releasing it shortly after they stop. */
+		holdResolutionWhileInteracting?: boolean;
 	}
 
 	let {
@@ -47,7 +53,10 @@
 		wheelZoomFactor = 1.2,
 		maxDpr = DEFAULT_MAX_DPR,
 		tileFadeDuration = 200,
-		constrainToBounds = false
+		maxTileMountsPerFrame,
+		constrainToBounds = false,
+		pauseWhileInteracting = true,
+		holdResolutionWhileInteracting = true
 	}: Props = $props();
 
 	let viewer: DziViewerMethods | undefined = $state();
@@ -82,6 +91,37 @@
 		const deviceDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 		return getOptimalLevel(dzi, imageBounds, zoom, clampDpr(deviceDpr, maxDpr));
 	});
+
+	// --- Debounced pause/hold during interaction ---
+
+	/** How long after the last drag, wheel or pinch event to resume downloads and release the resolution. */
+	const SETTLE_DELAY_MS = 150;
+	let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function settle(): void {
+		settleTimer = undefined;
+		viewer?.releaseResolution();
+		viewer?.resumeLoading();
+	}
+
+	function handleInteract(): void {
+		if (!pauseWhileInteracting && !holdResolutionWhileInteracting) {
+			return;
+		}
+		// Only pause/hold at the start of a gesture; later events just push the settle time back.
+		if (settleTimer === undefined) {
+			if (pauseWhileInteracting) {
+				viewer?.pauseLoading();
+			}
+			if (holdResolutionWhileInteracting) {
+				viewer?.holdResolution();
+			}
+		}
+		clearTimeout(settleTimer);
+		settleTimer = setTimeout(settle, SETTLE_DELAY_MS);
+	}
+
+	$effect(() => () => clearTimeout(settleTimer));
 
 	function applyViewport(target: Viewport | null): void {
 		if (!target) {
@@ -181,6 +221,7 @@
 			{wheelZoomFactor}
 			{maxDpr}
 			{tileFadeDuration}
+			{maxTileMountsPerFrame}
 			{constraints}
 			bind:x
 			bind:y
@@ -188,6 +229,7 @@
 			bind:containerSize
 			bind:dzi
 			bind:isOptimalLoaded
+			onInteract={handleInteract}
 			alt="Interactive Deep Zoom Image viewer"
 		/>
 	</div>

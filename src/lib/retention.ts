@@ -84,6 +84,64 @@ export function subtractRects(
 	);
 }
 
+/**
+ * Joins rectangles that share an edge exactly into larger ones: first along rows, then down columns.
+ *
+ * Tiles in one level form a grid, so the areas left uncovered and the tiles covering them arrive as many
+ * small touching squares. `subtractRects` is O(uncovered × cuts) and every cut that partly overlaps splits
+ * a rectangle into up to four, so merging first keeps both lists short. The union covered stays the same.
+ */
+export function mergeAdjacentRects(rects: readonly Rect[], epsilon = COVERAGE_EPSILON): Rect[] {
+	const near = (a: number, b: number) => Math.abs(a - b) <= epsilon;
+
+	// Same row (y and height), touching left to right.
+	const rowSpans = [...rects]
+		.sort((a, b) => a.y - b.y || a.height - b.height || a.x - b.x)
+		.reduce<Rect[]>((spans, rect) => {
+			const last = spans.at(-1);
+			if (
+				last &&
+				near(last.y, rect.y) &&
+				near(last.height, rect.height) &&
+				near(last.x + last.width, rect.x)
+			) {
+				spans[spans.length - 1] = { ...last, width: rect.x + rect.width - last.x };
+				return spans;
+			}
+			spans.push(rect);
+			return spans;
+		}, []);
+
+	// Same column (x and width), touching top to bottom.
+	return rowSpans
+		.sort((a, b) => a.x - b.x || a.width - b.width || a.y - b.y)
+		.reduce<Rect[]>((blocks, rect) => {
+			const last = blocks.at(-1);
+			if (
+				last &&
+				near(last.x, rect.x) &&
+				near(last.width, rect.width) &&
+				near(last.y + last.height, rect.y)
+			) {
+				blocks[blocks.length - 1] = { ...last, height: rect.y + rect.height - last.y };
+				return blocks;
+			}
+			blocks.push(rect);
+			return blocks;
+		}, []);
+}
+
+/**
+ * Orders tiles by row then column.
+ *
+ * Tiles are absolutely positioned, so their DOM order never affects what's drawn. A fixed order matters
+ * for speed: `optimalTiles` is sorted by distance from the viewport centre, which changes every frame while
+ * panning, and a keyed `{#each}` would otherwise physically move tile elements in the DOM on every frame.
+ */
+export function byGridPosition(a: CachedTile, b: CachedTile): number {
+	return a.row - b.row || a.col - b.col;
+}
+
 export interface RenderPlanParams {
 	readonly dzi: DziDescriptor;
 	readonly optimalLevel: number;
@@ -150,6 +208,7 @@ export function computeRenderPlan({
 			uncoveredVisibleRects.push(visiblePart);
 		}
 	});
+	readyOptimalTiles.sort(byGridPosition);
 
 	if (uncoveredVisibleRects.length === 0) {
 		const optimalLayer: RenderLevelLayer = {
@@ -167,20 +226,18 @@ export function computeRenderPlan({
 		};
 	}
 
-	// Group ready fallback tiles from all other levels that intersect the current viewport.
-	const fallbacksByLevel = cache
-		.getReadyTiles()
-		.filter(
-			(tile) =>
-				tile.level !== optimalLevel &&
-				rectIntersects(tile.stageRect, visibleBounds, COVERAGE_EPSILON)
-		)
-		.reduce((map, tile) => {
-			const group = map.get(tile.level) ?? [];
-			group.push(tile);
-			map.set(tile.level, group);
-			return map;
-		}, new Map<number, CachedTile[]>());
+	// Ready fallback tiles from every other level that intersect the current viewport, using the cache's level index.
+	const fallbacksByLevel = new Map(
+		Array.from(cache.getReadyTilesByLevel())
+			.filter(([level]) => level !== optimalLevel)
+			.map(([level, tiles]): [number, CachedTile[]] => [
+				level,
+				Array.from(tiles).filter((tile) =>
+					rectIntersects(tile.stageRect, visibleBounds, COVERAGE_EPSILON)
+				)
+			])
+			.filter(([, tiles]) => tiles.length > 0)
+	);
 
 	// Prefer fallback levels closest in resolution to the optimal level; break ties in favour of sharper levels.
 	const sortedFallbackLevels = Array.from(fallbacksByLevel.keys()).sort((a, b) => {
@@ -213,14 +270,16 @@ export function computeRenderPlan({
 			needed.forEach((tile) => cache.touch(tile.key));
 
 			// Only opaque fallback tiles remove coverage from coarser levels beneath them.
-			const opaqueCuts = needed.filter((tile) => isOpaque(tile.key)).map((tile) => tile.stageRect);
+			const opaqueCuts = mergeAdjacentRects(
+				needed.filter((tile) => isOpaque(tile.key)).map((tile) => tile.stageRect)
+			);
 
 			return {
 				uncovered: opaqueCuts.length > 0 ? subtractRects(acc.uncovered, opaqueCuts) : acc.uncovered,
-				selected: [...acc.selected, { level, tiles: needed }]
+				selected: [...acc.selected, { level, tiles: needed.sort(byGridPosition) }]
 			};
 		},
-		{ uncovered: uncoveredVisibleRects, selected: [] }
+		{ uncovered: mergeAdjacentRects(uncoveredVisibleRects), selected: [] }
 	);
 
 	// Reverse so farthest fallback sits at the bottom and closest fallback sits directly under the optimal level.

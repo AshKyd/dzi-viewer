@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { devicePixelRatio } from 'svelte/reactivity/window';
 	import { getClosestSingleTileLevel, getTileStageRect, loadDzi } from '../../dzi.js';
+	import { DEFAULT_MAX_TILE_MOUNTS_PER_FRAME, limitTileChanges } from '../../mountBudget.js';
 	import {
 		EMPTY_PRECACHE_RESULT,
 		precacheBounds as runPrecacheBounds,
@@ -22,6 +23,7 @@
 		PrecacheOptions,
 		PrecacheResult,
 		Rect,
+		RenderLevelLayer,
 		Size,
 		TileSpec,
 		Viewport,
@@ -58,6 +60,7 @@
 		failedTileRetryDelay = 5000,
 		preloadBaseLevel = true,
 		tileFadeDuration = 200,
+		maxTileMountsPerFrame = DEFAULT_MAX_TILE_MOUNTS_PER_FRAME,
 		crossOrigin,
 		getTileUrl,
 		alt = '',
@@ -72,13 +75,32 @@
 	let sourceId = $state('source-0');
 	let sourceCounter = 0;
 	let lastActiveRequestSignature = '';
+	/** Pyramid level the viewer won't go above while `holdResolution()` is active. */
+	let heldLevel = $state<number | undefined>();
 
 	// Deliberately not reactive: `bumpCacheVersion()` re-runs the render plan when this changes.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const opaqueTileKeys = new Set<string>();
 
+	let pendingCacheVersionFrame: number | undefined;
+
+	/**
+	 * Marks the cache as changed so the render plan is rebuilt.
+	 * Tile loads and fade-ins arrive in bursts (up to `maxConcurrentLoads` at once, then a fade-in each),
+	 * so changes are batched into at most one rebuild per animation frame instead of one per event.
+	 */
 	function bumpCacheVersion(): void {
-		cacheVersion = untrack(() => cacheVersion) + 1;
+		if (pendingCacheVersionFrame !== undefined) {
+			return;
+		}
+		if (typeof requestAnimationFrame === 'undefined') {
+			cacheVersion = untrack(() => cacheVersion) + 1;
+			return;
+		}
+		pendingCacheVersionFrame = requestAnimationFrame(() => {
+			pendingCacheVersionFrame = undefined;
+			cacheVersion = untrack(() => cacheVersion) + 1;
+		});
 	}
 
 	function handleTileOpaque(key: string): void {
@@ -89,8 +111,30 @@
 		bumpCacheVersion();
 	}
 
+	/** With fades off, a tile covers what's underneath as soon as it's in the DOM. */
+	function handleTileMount(key: string): void {
+		if (untrack(() => tileFadeDuration) > 0) {
+			return;
+		}
+		handleTileOpaque(key);
+	}
+
 	function handleTileUnmount(key: string): void {
 		opaqueTileKeys.delete(key);
+	}
+
+	/**
+	 * `animationend` bubbles, so one listener on the viewport catches every tile's fade-in finishing.
+	 * Tiles removed mid-fade never fire it, which is fine: they're no longer covering anything.
+	 */
+	function handleTileAnimationEnd(event: AnimationEvent): void {
+		if (event.animationName !== 'dzi-fade-in' || !(event.target instanceof HTMLElement)) {
+			return;
+		}
+		const { tileKey } = event.target.dataset;
+		if (tileKey) {
+			handleTileOpaque(tileKey);
+		}
 	}
 
 	const cache = new TileCache();
@@ -134,7 +178,8 @@
 			dpr: effectiveDpr,
 			maxDpr,
 			quality,
-			sourceId
+			sourceId,
+			maxLevel: heldLevel
 		});
 	});
 
@@ -152,9 +197,62 @@
 			optimalTiles: tileSelection.tiles,
 			visibleBounds: tileSelection.visibleBounds,
 			cache,
-			opaqueTileKeys: tileFadeDuration > 0 ? opaqueTileKeys : undefined
+			// Always passed: with the mount budget, a ready tile may not be in the DOM yet, so even with
+			// fades off it only covers fallbacks once it has mounted (see `handleTileMount`).
+			opaqueTileKeys
 		});
 	});
+
+	// --- Per-frame mount budget ---
+
+	/** Tile layers actually in the DOM. Moves towards `renderPlan.layers` a few tiles per frame. */
+	let displayedLayers = $state.raw<readonly RenderLevelLayer[]>([]);
+	let hasPendingTileChanges = $state(false);
+	let pendingMountFrame: number | undefined;
+
+	const isMountBudgeted = $derived(Number.isFinite(maxTileMountsPerFrame));
+	/**
+	 * Layers in a fixed DOM order (by level). Stacking comes from each layer's `z-index`, so this order never
+	 * changes what's drawn. The plan's order shifts as fallbacks come and go, and a keyed `{#each}` would
+	 * otherwise physically move whole layers in the DOM to match.
+	 */
+	const renderedLayers = $derived(
+		[...(isMountBudgeted ? displayedLayers : renderPlan.layers)].sort((a, b) => a.level - b.level)
+	);
+
+	/** Applies one frame's worth of tile adds and removes, and schedules the next frame if any are left. */
+	function applyMountBudget(): void {
+		untrack(() => {
+			const maxAdds = Math.max(1, maxTileMountsPerFrame);
+			const { layers, pending } = limitTileChanges({
+				displayed: displayedLayers,
+				planned: renderPlan.layers,
+				maxAdds,
+				// Removing a tile is cheaper than creating one.
+				maxRemoves: maxAdds * 2,
+				viewportCentre: effectiveViewport
+			});
+			displayedLayers = layers;
+			hasPendingTileChanges = pending;
+			if (pending) {
+				scheduleMountBudget();
+			}
+		});
+	}
+
+	function scheduleMountBudget(): void {
+		if (pendingMountFrame !== undefined) {
+			return;
+		}
+		if (typeof requestAnimationFrame === 'undefined') {
+			applyMountBudget();
+			return;
+		}
+		pendingMountFrame = requestAnimationFrame(() => {
+			pendingMountFrame = undefined;
+			applyMountBudget();
+		});
+	}
 
 	// --- Effects ---
 
@@ -174,7 +272,37 @@
 	$effect(() => {
 		return () => {
 			loader.dispose();
+			if (pendingCacheVersionFrame !== undefined) {
+				cancelAnimationFrame(pendingCacheVersionFrame);
+			}
+			if (pendingMountFrame !== undefined) {
+				cancelAnimationFrame(pendingMountFrame);
+			}
 		};
+	});
+
+	// Move the DOM towards each new render plan, a budgeted number of tiles per frame.
+	$effect(() => {
+		const { layers } = renderPlan;
+		if (isMountBudgeted) {
+			scheduleMountBudget();
+			return;
+		}
+		// Unbudgeted, the template renders the plan directly. Track it so turning the budget back on carries on
+		// from what's on screen instead of re-adding every tile.
+		displayedLayers = layers;
+		hasPendingTileChanges = false;
+	});
+
+	// Tiles caught mid-fade when fading is turned off never fire `animationend`, so mark everything on screen opaque.
+	$effect(() => {
+		if (tileFadeDuration > 0) {
+			return;
+		}
+		untrack(() => renderedLayers).forEach((layer) =>
+			layer.tiles.forEach((tile) => opaqueTileKeys.add(tile.key))
+		);
+		bumpCacheVersion();
 	});
 
 	// Observe container size changes via ResizeObserver.
@@ -225,6 +353,9 @@
 		loader.reset();
 		cache.clear();
 		opaqueTileKeys.clear();
+		// Clear straight away rather than through the budget, which would leave the old image's tiles lingering.
+		displayedLayers = [];
+		hasPendingTileChanges = false;
 		lastActiveRequestSignature = '';
 		sourceId = `source-${sourceCounter}`;
 		dzi = null;
@@ -292,11 +423,14 @@
 	// so the cache stays within `maxCachedTiles` even while the viewport is still or tiles are precaching.
 	$effect(() => {
 		const { mountedTileKeys } = renderPlan;
+		const layersOnScreen = renderedLayers;
 		if (cache.size <= maxCachedTiles) {
 			return;
 		}
+		// Protect what's planned and what's on screen: tiles waiting to be removed are still showing.
 		const protectedKeys = new Set<string>([
 			...mountedTileKeys,
+			...layersOnScreen.flatMap((layer) => layer.tiles.map((tile) => tile.key)),
 			...(tileSelection?.tiles.map((tile) => tile.key) ?? []),
 			...(baseTileSpec ? [baseTileSpec.key] : [])
 		]);
@@ -304,9 +438,11 @@
 	});
 
 	// Expose optimal tile load status to consumers via bindable prop.
+	// Not loaded until the budget has finished mounting every planned tile.
 	$effect(() => {
-		if (isOptimalLoaded !== renderPlan.isOptimalLoaded) {
-			isOptimalLoaded = renderPlan.isOptimalLoaded;
+		const nextIsOptimalLoaded = renderPlan.isOptimalLoaded && !hasPendingTileChanges;
+		if (isOptimalLoaded !== nextIsOptimalLoaded) {
+			isOptimalLoaded = nextIsOptimalLoaded;
 		}
 	});
 
@@ -419,6 +555,18 @@
 	export function isLoadingPaused(): boolean {
 		return loader.isPaused;
 	}
+
+	export function holdResolution(): void {
+		heldLevel = tileSelection?.level;
+	}
+
+	export function releaseResolution(): void {
+		heldLevel = undefined;
+	}
+
+	export function isResolutionHeld(): boolean {
+		return heldLevel !== undefined;
+	}
 </script>
 
 <div
@@ -426,8 +574,10 @@
 	class="dzi-viewport {className}"
 	role={alt ? 'img' : undefined}
 	aria-label={alt || undefined}
+	style:--dzi-fade-duration="{tileFadeDuration}ms"
+	onanimationend={handleTileAnimationEnd}
 >
-	{#each renderPlan.layers as layer (layer.level)}
+	{#each renderedLayers as layer (layer.level)}
 		<div
 			class="dzi-level"
 			data-level={layer.level}
@@ -438,16 +588,13 @@
 			{#each layer.tiles as tile (tile.key)}
 				<div
 					class="dzi-tile"
+					class:dzi-tile-fade={tileFadeDuration > 0}
+					data-tile-key={tile.key}
 					style:left="{tile.pixelRect.x - layer.origin.x}px"
 					style:top="{tile.pixelRect.y - layer.origin.y}px"
 					style:width="{tile.pixelRect.width}px"
 					style:height="{tile.pixelRect.height}px"
-					use:attachTileImage={{
-						tile,
-						fadeDuration: tileFadeDuration,
-						onOpaque: handleTileOpaque,
-						onUnmount: handleTileUnmount
-					}}
+					use:attachTileImage={{ tile, onMount: handleTileMount, onUnmount: handleTileUnmount }}
 				></div>
 			{/each}
 		</div>
@@ -472,10 +619,30 @@
 		pointer-events: none;
 	}
 
+	/*
+	 * Tiles always have an explicit size, so `contain: strict` lets the browser skip re-laying-out
+	 * and re-styling the rest of the viewer when one tile mounts or unmounts.
+	 */
 	.dzi-tile {
 		position: absolute;
 		overflow: hidden;
 		pointer-events: none;
 		user-select: none;
+		contain: strict;
+	}
+
+	/*
+	 * Every newly mounted tile fades in, which crossfades between zoom levels. A CSS animation starts by
+	 * itself on mount and runs on the compositor, with no per-tile JS. Reduced motion keeps it: it's an
+	 * opacity change, not movement. The keyframes name is global so `animationend` can match it.
+	 */
+	.dzi-tile-fade {
+		animation: dzi-fade-in var(--dzi-fade-duration) ease-out both;
+	}
+
+	@keyframes -global-dzi-fade-in {
+		from {
+			opacity: 0;
+		}
 	}
 </style>

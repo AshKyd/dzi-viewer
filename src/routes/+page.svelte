@@ -1,11 +1,11 @@
 <script lang="ts">
 	import DziViewerDemo from '#lib/components/DziViewer/DziViewerDemo.svelte';
-	import { BEACH_DZI } from '../stories/exampleImages.js';
+	import { NOOSA_BEACH_DZI } from '../stories/exampleImages.js';
 </script>
 
 <main>
 	<h1>dzi-viewer</h1>
-	<DziViewerDemo source={BEACH_DZI} />
+	<DziViewerDemo source={NOOSA_BEACH_DZI} />
 </main>
 
 <style>

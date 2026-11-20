@@ -279,17 +279,33 @@ export function getLevelScale(maxLevel: number, level: number): number {
 }
 
 /**
+ * Level sizes per descriptor object. `getLevelSize` runs several times per visible tile on every animation
+ * frame, so each level's size is worked out once. Descriptors are treated as immutable.
+ */
+const levelSizeCache = new WeakMap<object, Map<number, Size>>();
+
+/**
  * Returns the pixel dimensions of pyramid `level` using Deep Zoom integer halving (`ceil(dim / 2^(maxLevel - level))`).
  */
 export function getLevelSize(
 	dzi: Pick<DziDescriptor, 'width' | 'height' | 'maxLevel'>,
 	level: number
 ): Size {
+	const sizes = levelSizeCache.get(dzi) ?? new Map<number, Size>();
+	levelSizeCache.set(dzi, sizes);
+
+	const cached = sizes.get(level);
+	if (cached) {
+		return cached;
+	}
+
 	const divisor = 2 ** (dzi.maxLevel - level);
-	return {
+	const size: Size = {
 		width: Math.max(1, Math.ceil(dzi.width / divisor)),
 		height: Math.max(1, Math.ceil(dzi.height / divisor))
 	};
+	sizes.set(level, size);
+	return size;
 }
 
 export function getLevelGrid(

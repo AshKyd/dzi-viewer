@@ -1,6 +1,11 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { BEACH_DZI, CANAL_DZI, HARBOUR_DZI, PARK_DZI } from '../../../stories/exampleImages.js';
+	import {
+		NOOSA_BEACH_DZI,
+		HERENGRACHT_DZI,
+		BARCELONA_HARBOUR_DZI,
+		ROMA_STREET_PARKLANDS_DZI
+	} from '../../../stories/exampleImages.js';
 	import DziViewerDemo from './DziViewerDemo.svelte';
 
 	const { Story } = defineMeta({
@@ -23,6 +28,9 @@
 			tileFadeDuration: {
 				control: { type: 'range', min: 0, max: 1500, step: 50 }
 			},
+			maxTileMountsPerFrame: {
+				control: { type: 'range', min: 1, max: 64, step: 1 }
+			},
 			initialMode: {
 				control: { type: 'inline-radio' },
 				options: ['fit', 'fill']
@@ -33,31 +41,34 @@
 			panY: 0.5,
 			zoomFactor: 1,
 			maxDpr: 1.5,
-			tileFadeDuration: 200
+			tileFadeDuration: 200,
+			maxTileMountsPerFrame: 8,
+			pauseWhileAnimating: true,
+			holdResolutionWhileAnimating: true
 		}
 	});
 </script>
 
 <Story
-	name="Canal Fit and Tween"
+	name="Herengracht Fit and Tween"
 	args={{
-		source: CANAL_DZI,
+		source: HERENGRACHT_DZI,
 		initialMode: 'fit'
 	}}
 />
 
 <Story
-	name="Harbour Fill Screen"
+	name="Barcelona Harbour Fill Screen"
 	args={{
-		source: HARBOUR_DZI,
+		source: BARCELONA_HARBOUR_DZI,
 		initialMode: 'fill'
 	}}
 />
 
 <Story
-	name="Beach Zoomed In (8160px)"
+	name="Noosa Beach Zoomed In (8160px)"
 	args={{
-		source: BEACH_DZI,
+		source: NOOSA_BEACH_DZI,
 		initialMode: 'fit',
 		panX: 0.3,
 		panY: 0.5,
@@ -66,9 +77,9 @@
 />
 
 <Story
-	name="Custom Virtual Stage 1000x1000"
+	name="Roma Street Parklands on a 1000x1000 Stage"
 	args={{
-		source: PARK_DZI,
+		source: ROMA_STREET_PARKLANDS_DZI,
 		stageSize: { width: 1000, height: 1000 },
 		initialMode: 'fit'
 	}}

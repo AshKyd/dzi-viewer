@@ -236,6 +236,42 @@ describe('TileCache and TileLoader', () => {
 		expect(startedUrls).toHaveLength(16);
 	});
 
+	it('keeps the ready-by-level index in step with status changes, deletes, evictions and clear', () => {
+		const cache = new TileCache({ maxCachedTiles: 16 });
+		const otherLevel = (col: number): TileSpec => ({
+			...makeSpec(col),
+			key: `src:9:${col}_0`,
+			level: 9
+		});
+		const readyKeysByLevel = () =>
+			Object.fromEntries(
+				Array.from(cache.getReadyTilesByLevel()).map(([level, tiles]) => [
+					level,
+					Array.from(tiles, (tile) => tile.key).sort()
+				])
+			);
+
+		cache.setReady(makeSpec(0));
+		cache.setReady(makeSpec(1));
+		cache.setReady(otherLevel(0));
+		cache.upsertFromSpec(makeSpec(2), 'loading');
+		expect(readyKeysByLevel()).toEqual({ 9: ['src:9:0_0'], 10: ['src:10:0_0', 'src:10:1_0'] });
+
+		// A ready tile that fails on a retry leaves the index; the last tile of a level removes the level.
+		cache.setError(makeSpec(1), new Error('gone'));
+		cache.delete('src:9:0_0');
+		expect(readyKeysByLevel()).toEqual({ 10: ['src:10:0_0'] });
+
+		// Eviction removes from the index too.
+		Array.from({ length: 20 }, (_, i) => makeSpec(i + 3)).forEach((spec) => cache.setReady(spec));
+		cache.evict(new Set());
+		expect(cache.getReadyTiles().every((tile) => cache.has(tile.key))).toBe(true);
+		expect(cache.has('src:10:0_0')).toBe(false);
+
+		cache.clear();
+		expect(cache.getReadyTilesByLevel().size).toBe(0);
+	});
+
 	it('evicts least-recently-used entries while protecting mounted keys', () => {
 		const cache = new TileCache({ maxCachedTiles: 16 });
 		const specs = Array.from({ length: 20 }, (_, i) => makeSpec(i));
