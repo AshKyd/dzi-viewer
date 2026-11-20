@@ -1,6 +1,6 @@
 /// <reference types="vitest/config" />
 import path from 'node:path';
-import adapter from '@sveltejs/adapter-auto';
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
@@ -15,10 +15,10 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 
-			// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-			// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-			adapter: adapter()
+			// The demo site is fully prerendered (see `src/routes/+layout.ts`) into `build/`.
+			adapter: adapter(),
+			// Set `BASE_PATH` (e.g. `/dzi-viewer`) when hosting under a sub-path, such as GitHub Pages.
+			paths: { base: (process.env.BASE_PATH ?? '') as '' | `/${string}` }
 		})
 	],
 	test: {

@@ -197,12 +197,12 @@ viewer.resumeLoading();
 
 Run each of these from the project root:
 
-- `npm run dev`: demo page at `src/routes`.
+- `npm run dev`: demo site at `src/routes`.
 - `npm run storybook`: component stories.
 - `npm test`: unit tests in Node, then the stories in a headless Chromium browser (needs `npx playwright install chromium`).
 - `npm run check`: type check with `svelte-check`.
 - `npm run lint` / `npm run format`: Prettier and ESLint.
-- `npm run build`: builds the package into `dist/`, including the vanilla bundle.
+- `npm run build`: builds the static demo site into `build/`, then the package into `dist/`, including the vanilla bundle. Set `BASE_PATH` (for example `BASE_PATH=/dzi-viewer`) when the site will be hosted under a sub-path.
 
 ## Contributing
 
