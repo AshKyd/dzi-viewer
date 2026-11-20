@@ -6,6 +6,7 @@ bun.lock
 bun.lockb
 
 # Miscellaneous
+CHANGELOG.md
 /static/
 /storybook-static/
 /openseadragon/
