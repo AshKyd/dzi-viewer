@@ -53,7 +53,7 @@ export {
 	makeTileKey
 } from './tiling.js';
 export { TileCache } from './tileCache.js';
-export { TileLoader } from './tileLoader.js';
+export { DEFAULT_MAX_CONCURRENT_LOADS, TileLoader } from './tileLoader.js';
 export type { TileLoaderConfig, TileLoaderOptions } from './tileLoader.js';
 export {
 	computeLayerOrigin,

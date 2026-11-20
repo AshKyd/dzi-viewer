@@ -31,7 +31,8 @@ function createManualLoader(options: { maxConcurrent?: number; onChange?: () => 
 	const resolvers: Array<() => void> = [];
 	const loader = new TileLoader({
 		cache,
-		maxConcurrent: options.maxConcurrent ?? 1,
+		// Pass `maxConcurrent: undefined` explicitly to use the loader's default.
+		maxConcurrent: 'maxConcurrent' in options ? options.maxConcurrent : 1,
 		onChange: options.onChange,
 		loadImage: (url) => {
 			startedUrls.push(url);
@@ -198,6 +199,41 @@ describe('TileCache and TileLoader', () => {
 		loader.setActiveTiles([]);
 		await vi.advanceTimersByTimeAsync(10_000);
 		expect(attempts).toBe(6);
+	});
+
+	it('holds viewport loads while paused, keeps precaching, and loads only the final viewport on resume', async () => {
+		const { loader, startedUrls, resolveNext } = createManualLoader({ maxConcurrent: 4 });
+
+		loader.pause();
+		expect(loader.isPaused).toBe(true);
+
+		// Intermediate viewports during an animation: nothing starts.
+		loader.setActiveTiles([makeSpec(0), makeSpec(1)]);
+		loader.setActiveTiles([makeSpec(2)]);
+		await flushPromises();
+		expect(startedUrls).toEqual([]);
+
+		// Precaching the destination still runs while paused.
+		const precachePromise = loader.precacheTiles([makeSpec(5)]);
+		expect(startedUrls).toEqual(['https://example.com/10/5_0.jpg']);
+		await resolveNext();
+		expect(await precachePromise).toMatchObject({ loaded: 1 });
+
+		// The animation lands: only the final viewport's tiles load.
+		loader.setActiveTiles([makeSpec(3), makeSpec(4)]);
+		loader.resume();
+		expect(loader.isPaused).toBe(false);
+		expect(startedUrls).toEqual([
+			'https://example.com/10/5_0.jpg',
+			'https://example.com/10/3_0.jpg',
+			'https://example.com/10/4_0.jpg'
+		]);
+	});
+
+	it('defaults to 16 parallel loads', () => {
+		const { loader, startedUrls } = createManualLoader({ maxConcurrent: undefined });
+		loader.setActiveTiles(Array.from({ length: 20 }, (_, col) => makeSpec(col)));
+		expect(startedUrls).toHaveLength(16);
 	});
 
 	it('evicts least-recently-used entries while protecting mounted keys', () => {

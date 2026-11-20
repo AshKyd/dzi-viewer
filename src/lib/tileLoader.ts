@@ -37,6 +37,17 @@ interface QueuedTask {
 	distanceSq: number;
 }
 
+/**
+ * Default number of tile loads in flight at once.
+ *
+ * HTTP/1.1 browsers cap a host at ~6 connections, which is why 6 used to be the norm. Over HTTP/2 or
+ * HTTP/3 every request shares one multiplexed connection, so more parallel requests cut latency for a
+ * full viewport of small tiles. It is not unlimited because loads can't be cancelled once started:
+ * keeping the rest in our own queue lets panning drop and reprioritise them.
+ * On an HTTP/1.1 host the browser simply queues the extra requests, so this is safe there too.
+ */
+export const DEFAULT_MAX_CONCURRENT_LOADS = 16;
+
 const DEFAULT_FAILED_TILE_RETRY_DELAY = 5000;
 const MAX_FAILED_TILE_RETRY_DELAY = 60_000;
 
@@ -114,13 +125,14 @@ export class TileLoader {
 
 	#inFlightCount = 0;
 	#generation = 0;
-	#maxConcurrent = 6;
+	#maxConcurrent = DEFAULT_MAX_CONCURRENT_LOADS;
 	#maxRetries = 1;
 	#failedTileRetryDelay = DEFAULT_FAILED_TILE_RETRY_DELAY;
 	#crossOrigin?: CrossOrigin;
 	#onChange?: () => void;
 	#onTileError?: (event: TileErrorEvent) => void;
 	#disposed = false;
+	#paused = false;
 
 	constructor({ cache, loadImage = defaultLoadImage, ...config }: TileLoaderOptions) {
 		this.#cache = cache;
@@ -318,6 +330,33 @@ export class TileLoader {
 		this.#disposed = true;
 	}
 
+	// --- Pause / resume ---
+
+	/**
+	 * Stops starting new viewport tile loads, e.g. during an animation where intermediate viewports
+	 * are only on screen for a frame. While paused:
+	 * - `setActiveTiles()` still updates the queue, so tiles that leave the view are dropped and
+	 *   `resume()` only loads what the final viewport needs.
+	 * - Precache loads keep running, so a destination can be warmed up while the animation plays.
+	 * - Loads already in flight finish normally.
+	 */
+	pause(): void {
+		this.#paused = true;
+	}
+
+	/** Starts loading queued viewport tiles again. */
+	resume(): void {
+		if (!this.#paused) {
+			return;
+		}
+		this.#paused = false;
+		this.#pump();
+	}
+
+	get isPaused(): boolean {
+		return this.#paused;
+	}
+
 	// --- Queue ---
 
 	#isLoadingNow(key: string): boolean {
@@ -367,7 +406,9 @@ export class TileLoader {
 			return [];
 		}
 
+		// While paused only precache work may start; viewport-only tiles wait for `resume()`.
 		const selected = Array.from(this.#queue.values())
+			.filter((task) => !this.#paused || task.precache)
 			.sort((a, b) => {
 				if (a.active !== b.active) {
 					return a.active ? -1 : 1;

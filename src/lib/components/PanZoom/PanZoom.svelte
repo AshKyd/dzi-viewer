@@ -309,6 +309,18 @@
 	export function screenToStage(point: Point): Point {
 		return viewer?.screenToStage(point) ?? point;
 	}
+
+	export function pauseLoading(): void {
+		viewer?.pauseLoading();
+	}
+
+	export function resumeLoading(): void {
+		viewer?.resumeLoading();
+	}
+
+	export function isLoadingPaused(): boolean {
+		return viewer?.isLoadingPaused() ?? false;
+	}
 </script>
 
 <!--

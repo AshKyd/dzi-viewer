@@ -9,7 +9,7 @@
 	} from '../../precache.js';
 	import { computeRenderPlan } from '../../retention.js';
 	import { TileCache } from '../../tileCache.js';
-	import { TileLoader } from '../../tileLoader.js';
+	import { DEFAULT_MAX_CONCURRENT_LOADS, TileLoader } from '../../tileLoader.js';
 	import {
 		buildSingleTileSpec,
 		clampDpr,
@@ -52,7 +52,7 @@
 		maxDpr = DEFAULT_MAX_DPR,
 		quality = 1,
 		constraints,
-		maxConcurrentLoads = 6,
+		maxConcurrentLoads = DEFAULT_MAX_CONCURRENT_LOADS,
 		maxCachedTiles = 256,
 		maxRetries = 1,
 		failedTileRetryDelay = 5000,
@@ -406,6 +406,18 @@
 
 	export function screenToStage(point: Point): Point {
 		return convertScreenToStage(point, effectiveViewport, containerSize);
+	}
+
+	export function pauseLoading(): void {
+		loader.pause();
+	}
+
+	export function resumeLoading(): void {
+		loader.resume();
+	}
+
+	export function isLoadingPaused(): boolean {
+		return loader.isPaused;
 	}
 </script>
 

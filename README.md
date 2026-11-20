@@ -103,6 +103,7 @@ All props are optional except `source`.
 - `maxDpr` (default `1.5`): caps the device pixel ratio used to pick tile resolution. Lower values load fewer tiles.
 - `quality` (default `1`): multiplies the resolution chosen. Use `0.5` for faster, softer images.
 - `tileFadeDuration` (default `200`): tile fade-in in milliseconds. `0` turns fading off.
+- `maxConcurrentLoads` (default `16`): tile downloads in flight at once. Suits HTTP/2 and HTTP/3 servers. Over HTTP/1.1 the browser queues anything past about 6 per host, so lower this if the server only speaks HTTP/1.1.
 - `maxCachedTiles` (default `256`): how many decoded tiles to keep in memory.
 - `maxRetries` (default `1`): immediate retries for a failed tile request.
 - `failedTileRetryDelay` (default `5000`): how long to wait before trying a failed, still-visible tile again. Doubles after each failure, up to 60 seconds.
@@ -122,8 +123,42 @@ Available through `bind:this` on either component, and on the vanilla controller
 - `precacheViewport(viewport, { signal }?)`: loads the tiles for a viewport ahead of time, for example before animating to it.
 - `precacheBounds(bounds, 'fit' | 'fill', options?)`: the same, for a fit or fill view of `bounds`.
 - `stageToScreen(point)` / `screenToStage(point)`: convert between stage coordinates and container pixels.
+- `pauseLoading()` / `resumeLoading()` / `isLoadingPaused()`: stop and restart downloading tiles for the current view. See below.
 
 The vanilla controller also has `update`, `setViewport`, `getViewport`, `getState` and `destroy`.
+
+## Pausing tile downloads
+
+By default the viewer requests tiles for every viewport it shows. During an animation, most of those viewports are on screen for a single frame. `pauseLoading()` stops new downloads until you call `resumeLoading()`. While paused:
+
+- Tiles already downloaded still show, and lower-resolution tiles fill any gaps.
+- The list of needed tiles keeps updating, so resuming only downloads what the final view needs.
+- `precacheViewport()` and `precacheBounds()` keep downloading, so you can load the destination while animating towards it.
+- Downloads already in progress finish.
+
+Animate to a target:
+
+```ts
+const target = viewer.getFitViewport(detailBounds);
+viewer.pauseLoading();
+void viewer.precacheViewport(target);
+await Promise.all([tweenX.set(target.x), tweenY.set(target.y), tweenZoom.set(target.zoom)]);
+viewer.resumeLoading();
+```
+
+Debounce downloads while the user drags or zooms:
+
+```ts
+let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+
+function handleInteract() {
+	viewer.pauseLoading();
+	clearTimeout(resumeTimer);
+	resumeTimer = setTimeout(() => viewer.resumeLoading(), 150);
+}
+```
+
+Pass `handleInteract` as `PanZoom`'s `onInteract` prop.
 
 ## Development
 

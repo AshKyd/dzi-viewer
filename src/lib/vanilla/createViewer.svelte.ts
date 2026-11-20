@@ -91,6 +91,9 @@ function createController(
 			Promise.resolve(EMPTY_PRECACHE_RESULT),
 		stageToScreen: (point) => viewer()?.stageToScreen(point) ?? point,
 		screenToStage: (point) => viewer()?.screenToStage(point) ?? point,
+		pauseLoading: () => viewer()?.pauseLoading(),
+		resumeLoading: () => viewer()?.resumeLoading(),
+		isLoadingPaused: () => viewer()?.isLoadingPaused() ?? false,
 		destroy() {
 			if (!mounted) {
 				return;

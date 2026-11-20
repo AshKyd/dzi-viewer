@@ -43,7 +43,7 @@ export interface OpenSeahorseProps {
 	quality?: number;
 	/** Optional min/max zoom and stage bounds clamping constraints. */
 	constraints?: ViewportConstraints;
-	/** Maximum number of concurrent tile fetches. */
+	/** Maximum number of concurrent tile fetches (defaults to `16`, suited to HTTP/2). */
 	maxConcurrentLoads?: number;
 	/** Maximum number of tiles retained in the LRU cache. */
 	maxCachedTiles?: number;
@@ -87,4 +87,13 @@ export interface OpenSeahorseMethods {
 	): Promise<PrecacheResult>;
 	stageToScreen(point: Point): Point;
 	screenToStage(point: Point): Point;
+	/**
+	 * Stops starting new tile downloads for the viewport, e.g. while animating or until a custom debounce
+	 * settles. The visible tile list keeps updating, so `resumeLoading()` only fetches what the final
+	 * viewport needs. Precache requests and loads already in flight still complete.
+	 */
+	pauseLoading(): void;
+	/** Starts downloading viewport tiles again after `pauseLoading()`. */
+	resumeLoading(): void;
+	isLoadingPaused(): boolean;
 }
