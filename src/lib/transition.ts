@@ -109,9 +109,7 @@ function interpolateFly(
 		return interpolateLinear(from, to, t);
 	}
 
-	const maxContainerSpan = containerSize
-		? Math.max(containerSize.width, containerSize.height)
-		: 0;
+	const maxContainerSpan = containerSize ? Math.max(containerSize.width, containerSize.height) : 0;
 	const referenceSpan = maxContainerSpan > 0 ? maxContainerSpan : DEFAULT_FLY_REFERENCE_SPAN;
 
 	const baseInterpolator =

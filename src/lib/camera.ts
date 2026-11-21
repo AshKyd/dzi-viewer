@@ -189,7 +189,10 @@ function makeBoundsTarget(
  *
  * Works identically with Svelte `bind:this` references (pass a getter `() => viewer`) and vanilla controllers.
  */
-export function createCamera(viewerInput: ViewerInput, cameraOptions: CameraOptions = {}): DziCamera {
+export function createCamera(
+	viewerInput: ViewerInput,
+	cameraOptions: CameraOptions = {}
+): DziCamera {
 	nextCameraId += 1;
 	const pauseReason = `camera-${nextCameraId}`;
 
@@ -460,13 +463,13 @@ export function createCamera(viewerInput: ViewerInput, cameraOptions: CameraOpti
 		return current;
 	}
 
-	function scheduleScrubSettle(
-		viewer: DziViewerMethods,
-		options?: ScrubOptions
-	): void {
+	function scheduleScrubSettle(viewer: DziViewerMethods, options?: ScrubOptions): void {
 		const wantPause = options?.pauseLoading ?? cameraOptions.pauseLoading ?? true;
 		const wantHold = options?.holdResolution ?? cameraOptions.holdResolution ?? true;
-		const settleDelay = Math.max(0, options?.settleDelayMs ?? cameraOptions.settleDelayMs ?? DEFAULT_SETTLE_DELAY_MS);
+		const settleDelay = Math.max(
+			0,
+			options?.settleDelayMs ?? cameraOptions.settleDelayMs ?? DEFAULT_SETTLE_DELAY_MS
+		);
 
 		if (!wantPause && !wantHold) {
 			clearSettleTimer();

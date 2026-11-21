@@ -177,11 +177,51 @@
 			preserveAspectRatio="none"
 			aria-hidden="true"
 		>
-			<rect x="0.5" y="0.5" width="99" height="99" fill="none" stroke="#38bdf8" stroke-width="0.6" />
-			<line x1="33.33" y1="0" x2="33.33" y2="100" stroke="#38bdf8" stroke-width="0.35" stroke-dasharray="2 2" />
-			<line x1="66.66" y1="0" x2="66.66" y2="100" stroke="#38bdf8" stroke-width="0.35" stroke-dasharray="2 2" />
-			<line x1="0" y1="33.33" x2="100" y2="33.33" stroke="#38bdf8" stroke-width="0.35" stroke-dasharray="2 2" />
-			<line x1="0" y1="66.66" x2="100" y2="66.66" stroke="#38bdf8" stroke-width="0.35" stroke-dasharray="2 2" />
+			<rect
+				x="0.5"
+				y="0.5"
+				width="99"
+				height="99"
+				fill="none"
+				stroke="#38bdf8"
+				stroke-width="0.6"
+			/>
+			<line
+				x1="33.33"
+				y1="0"
+				x2="33.33"
+				y2="100"
+				stroke="#38bdf8"
+				stroke-width="0.35"
+				stroke-dasharray="2 2"
+			/>
+			<line
+				x1="66.66"
+				y1="0"
+				x2="66.66"
+				y2="100"
+				stroke="#38bdf8"
+				stroke-width="0.35"
+				stroke-dasharray="2 2"
+			/>
+			<line
+				x1="0"
+				y1="33.33"
+				x2="100"
+				y2="33.33"
+				stroke="#38bdf8"
+				stroke-width="0.35"
+				stroke-dasharray="2 2"
+			/>
+			<line
+				x1="0"
+				y1="66.66"
+				x2="100"
+				y2="66.66"
+				stroke="#38bdf8"
+				stroke-width="0.35"
+				stroke-dasharray="2 2"
+			/>
 		</svg>
 	{/if}
 {/snippet}

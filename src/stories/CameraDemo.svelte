@@ -90,31 +90,33 @@
 
 	$effect(() => () => camera.destroy());
 
-	const regions = $derived.by((): ReadonlyArray<{ readonly name: string; readonly bounds: Rect }> => {
-		if (!dzi) {
-			return [];
-		}
-		return [
-			{
-				name: 'Detail A (left)',
-				bounds: {
-					x: dzi.width * 0.12,
-					y: dzi.height * 0.35,
-					width: dzi.width * 0.22,
-					height: dzi.height * 0.22
-				}
-			},
-			{
-				name: 'Detail B (right)',
-				bounds: {
-					x: dzi.width * 0.64,
-					y: dzi.height * 0.42,
-					width: dzi.width * 0.2,
-					height: dzi.height * 0.2
-				}
+	const regions = $derived.by(
+		(): ReadonlyArray<{ readonly name: string; readonly bounds: Rect }> => {
+			if (!dzi) {
+				return [];
 			}
-		];
-	});
+			return [
+				{
+					name: 'Detail A (left)',
+					bounds: {
+						x: dzi.width * 0.12,
+						y: dzi.height * 0.35,
+						width: dzi.width * 0.22,
+						height: dzi.height * 0.22
+					}
+				},
+				{
+					name: 'Detail B (right)',
+					bounds: {
+						x: dzi.width * 0.64,
+						y: dzi.height * 0.42,
+						width: dzi.width * 0.2,
+						height: dzi.height * 0.2
+					}
+				}
+			];
+		}
+	);
 
 	const trackStops = $derived.by((): readonly ViewportTrackStop[] => {
 		const [detailA, detailB] = regions;
@@ -259,7 +261,9 @@
 		<span>Status: {lastResult}</span>
 		<span>| Curve: {curve}</span>
 		<span>| {isTransitioning ? 'Transitioning' : 'Idle'}</span>
-		<span>| {isOptimalLoaded ? 'Optimal loaded' : activeSource ? 'Loading tiles...' : 'Empty'}</span>
+		<span>
+			| {isOptimalLoaded ? 'Optimal loaded' : activeSource ? 'Loading tiles...' : 'Empty'}
+		</span>
 	</div>
 
 	<div class="demo-stage" class:compact={isCompactWidth}>
