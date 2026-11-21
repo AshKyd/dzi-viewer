@@ -4,7 +4,6 @@ import type { DziViewerMethods, DziViewerProps } from '../components/DziViewer/d
 import PanZoom from '../components/PanZoom/PanZoom.svelte';
 import type { PanZoomProps } from '../components/PanZoom/panZoomTypes.js';
 import { EMPTY_PRECACHE_RESULT } from '../precache.js';
-import type { Viewport } from '../types.js';
 import {
 	ReactiveBridge,
 	type StateChangeListener,
@@ -15,12 +14,12 @@ import type { ViewerStateSnapshot } from './vanillaUtils.js';
 
 export type { ViewerStateSnapshot } from './vanillaUtils.js';
 
-export interface VanillaDziViewerOptions extends DziViewerProps {
+export interface VanillaDziViewerOptions extends Omit<DziViewerProps, 'children'> {
 	/** Called once per change to `x`, `y`, `zoom`, `containerSize`, `dzi` or `isOptimalLoaded` made by the viewer. */
 	onStateChange?: StateChangeListener;
 }
 
-export interface VanillaPanZoomOptions extends PanZoomProps {
+export interface VanillaPanZoomOptions extends Omit<PanZoomProps, 'children'> {
 	/** Called once per change to `x`, `y`, `zoom`, `containerSize`, `dzi` or `isOptimalLoaded` made by the viewer. */
 	onStateChange?: StateChangeListener;
 }
@@ -28,10 +27,6 @@ export interface VanillaPanZoomOptions extends PanZoomProps {
 export interface DziViewerController extends DziViewerMethods {
 	/** Updates any subset of `DziViewer` props. Updating `x`, `y`, or `zoom` overrides the current viewport. */
 	update: (props: Partial<VanillaDziViewerOptions>) => void;
-	/** Sets the viewport centre and/or zoom. */
-	setViewport: (viewport: Partial<Viewport>) => void;
-	/** Returns the current `{ x, y, zoom }` viewport. */
-	getViewport: () => Viewport;
 	/** Returns the current viewer state snapshot. */
 	getState: () => ViewerStateSnapshot;
 	/** Unmounts the viewer from its target DOM element. */
@@ -72,11 +67,20 @@ function createController(
 			}
 		},
 		setViewport(viewport) {
-			if (mounted) {
-				bridge.update(viewport);
+			if (!mounted) {
+				return;
 			}
+			const currentViewer = viewer();
+			if (currentViewer) {
+				currentViewer.setViewport(viewport);
+				return;
+			}
+			bridge.update(viewport);
 		},
-		getViewport: () => bridge.getViewport(),
+		getViewport: () => viewer()?.getViewport() ?? bridge.getViewport(),
+		getImageBounds: () => viewer()?.getImageBounds() ?? null,
+		getContainerSize: () => viewer()?.getContainerSize() ?? bridge.getSnapshot().containerSize,
+		subscribe: (listener) => viewer()?.subscribe(listener) ?? (() => undefined),
 		getState: () => bridge.getSnapshot(),
 		getFitViewport: (bounds, fitOptions) => viewer()?.getFitViewport(bounds, fitOptions) ?? null,
 		getFillViewport: (bounds, fitOptions) => viewer()?.getFillViewport(bounds, fitOptions) ?? null,
@@ -88,8 +92,8 @@ function createController(
 			Promise.resolve(EMPTY_PRECACHE_RESULT),
 		stageToScreen: (point) => viewer()?.stageToScreen(point) ?? point,
 		screenToStage: (point) => viewer()?.screenToStage(point) ?? point,
-		pauseLoading: () => viewer()?.pauseLoading(),
-		resumeLoading: () => viewer()?.resumeLoading(),
+		pauseLoading: (reason) => viewer()?.pauseLoading(reason),
+		resumeLoading: (reason) => viewer()?.resumeLoading(reason),
 		isLoadingPaused: () => viewer()?.isLoadingPaused() ?? false,
 		holdResolution: () => viewer()?.holdResolution(),
 		releaseResolution: () => viewer()?.releaseResolution(),

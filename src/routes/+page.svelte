@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { asset } from '$app/paths';
 	import { Button, Header, LayoutContentWidth, ReaderTypography, Tabs } from 'svelte-akui';
-	import type { DziViewerMethods } from '#lib/components/DziViewer/dziViewerTypes.js';
 	import PanZoom from '#lib/components/PanZoom/PanZoom.svelte';
-	import type { DziDescriptor, Size } from '#lib/types.js';
 	import {
 		BARCELONA_HARBOUR_DZI,
 		HERENGRACHT_DZI,
@@ -51,42 +49,14 @@
 	const activeImage = $derived(
 		exampleImages.find((image) => image.id === activeId) ?? exampleImages[0]
 	);
-
-	let viewer: DziViewerMethods | undefined = $state();
-	let x = $state(0);
-	let y = $state(0);
-	let zoom = $state(0.1);
-	let dzi = $state<DziDescriptor | null>(null);
-	let containerSize = $state<Size>({ width: 0, height: 0 });
-	/** The last image framed in the viewer, so each newly loaded image is framed once. */
-	let framedDzi: DziDescriptor | null = null;
-
-	// Fill the viewer with each image once it has loaded and the container has a size, so it starts slightly
-	// zoomed in with no empty bands at the edges.
-	$effect(() => {
-		if (!dzi || dzi === framedDzi || containerSize.width === 0) {
-			return;
-		}
-		const fill = viewer?.getFillViewport();
-		if (!fill) {
-			return;
-		}
-		({ x, y, zoom } = fill);
-		framedDzi = dzi;
-	});
 </script>
 
 {#snippet viewerPanel()}
 	<div class="viewer">
 		<PanZoom
-			bind:this={viewer}
 			source={activeImage.source}
+			initialView="fill"
 			alt={activeImage.alt}
-			bind:x
-			bind:y
-			bind:zoom
-			bind:dzi
-			bind:containerSize
 			cooperativeGestures
 		/>
 	</div>
@@ -149,8 +119,8 @@
 			<pre><code>{VANILLA_EXAMPLE}</code></pre>
 
 			<p>
-				Props, methods, pausing downloads and holding the resolution are covered in the
-				<a href="https://github.com/AshKyd/dzi-viewer#readme">README on GitHub</a>.
+				Props, overlays, camera transitions, pausing downloads and holding the resolution are
+				covered in the <a href="https://github.com/AshKyd/dzi-viewer#readme">README on GitHub</a>.
 			</p>
 		</ReaderTypography>
 	</LayoutContentWidth>

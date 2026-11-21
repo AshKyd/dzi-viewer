@@ -35,6 +35,11 @@ export interface PanZoomProps extends DziViewerProps {
 	cooperativeGestures?: boolean;
 	/** Overrides the hint text shown by `cooperativeGestures`. */
 	cooperativeGestureMessages?: Partial<CooperativeGestureMessages>;
+	/**
+	 * Debounce delay in ms before resuming viewport tile downloads after user pan/zoom gestures.
+	 * Defaults to `0` (load immediately).
+	 */
+	loadDebounceMs?: number;
 	/** Invoked whenever user pan/zoom interaction updates the viewport. */
 	onInteract?: (viewport: Viewport) => void;
 }

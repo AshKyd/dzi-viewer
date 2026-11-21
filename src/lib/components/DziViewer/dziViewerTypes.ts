@@ -1,3 +1,4 @@
+import type { Snippet } from 'svelte';
 import type {
 	DziDescriptor,
 	DziSourceInput,
@@ -10,15 +11,41 @@ import type {
 	TileUrlBuilder,
 	Viewport,
 	ViewportConstraints,
-	ViewportFitOptions
+	ViewportFitOptions,
+	ViewportTarget
 } from '../../types.js';
 
 // Component types live in plain `.ts` so type-aware tooling (ESLint, plain `tsc`) can read them.
 // Those tools can't parse `.svelte` files and would see every `.svelte` export as an error type.
 
+/** Context passed to the `DziViewer` / `PanZoom` `children` overlay snippet. */
+export interface DziViewerSnippetContext {
+	readonly viewport: Viewport;
+	readonly containerSize: Size;
+	readonly dzi: DziDescriptor | null;
+	readonly imageBounds: Rect | null;
+	stageToScreen(point: Point): Point;
+	screenToStage(point: Point): Point;
+	stageRectToScreen(rect: Rect): Rect;
+	stageRectToStyle(rect: Rect): string;
+}
+
+export type ViewerLifecycleEvent =
+	| { readonly type: 'load'; readonly dzi: DziDescriptor }
+	| { readonly type: 'resize'; readonly containerSize: Size }
+	| { readonly type: 'source-change' }
+	| { readonly type: 'interact'; readonly viewport: Viewport }
+	| { readonly type: 'destroy' };
+
+export type ViewerLifecycleListener = (event: ViewerLifecycleEvent) => void;
+
 export interface DziViewerProps {
-	/** DZI descriptor URL (`.dzi` XML/JSON), inline DZI JSON object, or pre-parsed `DziDescriptor`. */
-	source: DziSourceInput;
+	/** DZI descriptor URL (`.dzi` XML/JSON), inline DZI JSON object, or pre-parsed `DziDescriptor`. Pass `null`/`''` to clear. */
+	source?: DziSourceInput | null;
+	/** Viewport applied once per `source` as soon as the DZI descriptor and container size are known. */
+	initialView?: ViewportTarget;
+	/** Optional overlay content rendered above tile layers inside the viewer container. */
+	children?: Snippet<[DziViewerSnippetContext]>;
 	/** Viewport centre X in virtual stage coordinates. */
 	x?: number;
 	/** Viewport centre Y in virtual stage coordinates. */
@@ -78,6 +105,16 @@ export interface DziViewerProps {
 
 /** Methods exported by `DziViewer` and `PanZoom` instances (via `bind:this`). */
 export interface DziViewerMethods {
+	/** Updates any subset of `x`, `y`, and `zoom` on the viewer. */
+	setViewport(viewport: Partial<Viewport>): void;
+	/** Returns the currently rendered (clamped) `{ x, y, zoom }` viewport. */
+	getViewport(): Viewport;
+	/** Returns the resolved stage-space bounds of the loaded DZI image, or `null` before load. */
+	getImageBounds(): Rect | null;
+	/** Returns the measured container dimensions in CSS pixels. */
+	getContainerSize(): Size;
+	/** Subscribes to viewer lifecycle events (`load`, `resize`, `source-change`, `interact`, `destroy`). */
+	subscribe(listener: ViewerLifecycleListener): () => void;
 	/** Viewport that fits `bounds` inside the container (defaults to the image bounds). */
 	getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
 	/** Viewport that fills the container with `bounds` (defaults to the image bounds). */
@@ -96,10 +133,11 @@ export interface DziViewerMethods {
 	 * Stops starting new tile downloads for the viewport, e.g. while animating or until a custom debounce
 	 * settles. The visible tile list keeps updating, so `resumeLoading()` only fetches what the final
 	 * viewport needs. Precache requests and loads already in flight still complete.
+	 * Pass an optional `reason` token to scope independent callers.
 	 */
-	pauseLoading(): void;
+	pauseLoading(reason?: string): void;
 	/** Starts downloading viewport tiles again after `pauseLoading()`. */
-	resumeLoading(): void;
+	resumeLoading(reason?: string): void;
 	isLoadingPaused(): boolean;
 	/**
 	 * Stops the viewer switching to a sharper pyramid level, e.g. during a zoom animation, so it doesn't

@@ -38,6 +38,60 @@ export interface ViewportFitOptions {
 	readonly padding?: Padding;
 }
 
+export interface ViewportTolerance {
+	/** Maximum difference in stage units for `x` and `y` (defaults to `0.01`). */
+	readonly position?: number;
+	/** Relative zoom tolerance scaled by `Math.max(1, a.zoom, b.zoom)` (defaults to `1e-6`). */
+	readonly zoom?: number;
+}
+
+export type EasingFunction = (t: number) => number;
+
+/**
+ * Interpolation path between two viewports.
+ * - `'direct'`: exponential zoom with inverse-zoom-weighted pan straight towards the target.
+ * - `'fly'`: van Wijk & Nuij smooth pan-and-zoom arc via `d3-interpolate`'s `interpolateZoom`.
+ */
+export type TransitionCurve = 'direct' | 'fly';
+
+export interface BoundsTarget {
+	/** Stage-space rectangle to frame (defaults to the loaded image bounds). */
+	readonly bounds?: Rect;
+	/** Whether to contain (`'fit'`, default) or cover (`'fill'`) the container. */
+	readonly mode?: 'fit' | 'fill';
+	/** Optional CSS pixel padding around the framed bounds. */
+	readonly padding?: Padding;
+}
+
+export interface ViewportTargetContext {
+	readonly imageBounds: Rect;
+	readonly containerSize: Size;
+}
+
+/** Dynamic resolver for custom coordinate systems (e.g. legacy normalised crop/zoom). */
+export type ViewportTargetResolver = (context: ViewportTargetContext) => Viewport;
+
+export type ViewportTarget = Viewport | BoundsTarget | 'fit' | 'fill' | ViewportTargetResolver;
+
+export interface InterpolateViewportOptions {
+	readonly curve?: TransitionCurve;
+	readonly easing?: EasingFunction;
+	/** Container dimensions used to compute the visible span for `'fly'` curves. */
+	readonly containerSize?: Size;
+	/** Curvature factor passed to `d3-interpolate`'s `interpolateZoom.rho(rho)` for `'fly'` curves. */
+	readonly rho?: number;
+}
+
+export interface ViewportTrackStop {
+	/** Track position for this stop (stops are expected in ascending `at` order). */
+	readonly at: number;
+	readonly target: ViewportTarget;
+	/** Easing applied to the segment arriving at this stop. */
+	readonly easing?: EasingFunction;
+	/** Curve applied to the segment arriving at this stop. */
+	readonly curve?: TransitionCurve;
+}
+
 export interface ViewportConstraints {
 	readonly minZoom?: number;
 	readonly maxZoom?: number;

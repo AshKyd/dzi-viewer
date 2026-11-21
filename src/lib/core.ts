@@ -1,7 +1,13 @@
 // Everything except the Svelte components and vanilla factories.
 // Shared by the Svelte entry (`index.ts`) and the vanilla entry (`vanilla/index.ts`).
 
-export type { DziViewerMethods, DziViewerProps } from './components/DziViewer/dziViewerTypes.js';
+export type {
+	DziViewerMethods,
+	DziViewerProps,
+	DziViewerSnippetContext,
+	ViewerLifecycleEvent,
+	ViewerLifecycleListener
+} from './components/DziViewer/dziViewerTypes.js';
 export type {
 	CooperativeGestureMessages,
 	PanZoomProps
@@ -42,8 +48,32 @@ export {
 	rectIntersects,
 	resolveStageAndImageBounds,
 	screenToStage,
-	stageToScreen
+	stageRectToScreen,
+	stageRectToStyle,
+	stageToScreen,
+	viewportsEqual
 } from './viewport.js';
+
+export {
+	easeOutCubic,
+	findTrackSegment,
+	interpolateTarget,
+	interpolateViewport,
+	isViewportTargetExplicit,
+	resolveViewportTarget,
+	sampleViewportTrack
+} from './transition.js';
+export type { TrackSegmentMatch } from './transition.js';
+
+export { createCamera } from './camera.js';
+export type {
+	CameraOptions,
+	DziCamera,
+	ScrubOptions,
+	ScrubPrecacheMode,
+	TransitionOptions,
+	TransitionResult
+} from './camera.js';
 
 export {
 	buildSingleTileSpec,
@@ -66,6 +96,7 @@ export {
 export { EMPTY_PRECACHE_RESULT, precacheBounds, precacheViewport } from './precache.js';
 
 export type {
+	BoundsTarget,
 	CachedTile,
 	DisplayRect,
 	DziDescriptor,
@@ -73,6 +104,8 @@ export type {
 	DziJsonInput,
 	DziLoadOptions,
 	DziSourceInput,
+	EasingFunction,
+	InterpolateViewportOptions,
 	Padding,
 	PaddingEdges,
 	Point,
@@ -86,7 +119,13 @@ export type {
 	TileSpec,
 	TileStatus,
 	TileUrlBuilder,
+	TransitionCurve,
 	Viewport,
 	ViewportConstraints,
-	ViewportFitOptions
+	ViewportFitOptions,
+	ViewportTarget,
+	ViewportTargetContext,
+	ViewportTargetResolver,
+	ViewportTolerance,
+	ViewportTrackStop
 } from './types.js';

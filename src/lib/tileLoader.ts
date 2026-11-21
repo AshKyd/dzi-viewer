@@ -132,7 +132,7 @@ export class TileLoader {
 	#onChange?: () => void;
 	#onTileError?: (event: TileErrorEvent) => void;
 	#disposed = false;
-	#paused = false;
+	readonly #pauseReasons = new Set<string>();
 
 	constructor({ cache, loadImage = defaultLoadImage, ...config }: TileLoaderOptions) {
 		this.#cache = cache;
@@ -339,22 +339,26 @@ export class TileLoader {
 	 *   `resume()` only loads what the final viewport needs.
 	 * - Precache loads keep running, so a destination can be warmed up while the animation plays.
 	 * - Loads already in flight finish normally.
+	 *
+	 * Pass a `reason` token to scope independent callers (e.g. debounce vs camera transitions)
+	 * so one caller resuming never cancels another caller's active pause.
 	 */
-	pause(): void {
-		this.#paused = true;
+	pause(reason = 'default'): void {
+		this.#pauseReasons.add(reason);
 	}
 
-	/** Starts loading queued viewport tiles again. */
-	resume(): void {
-		if (!this.#paused) {
+	/** Starts loading queued viewport tiles again once all active pause reasons are cleared. */
+	resume(reason = 'default'): void {
+		if (!this.#pauseReasons.delete(reason)) {
 			return;
 		}
-		this.#paused = false;
-		this.#pump();
+		if (this.#pauseReasons.size === 0) {
+			this.#pump();
+		}
 	}
 
 	get isPaused(): boolean {
-		return this.#paused;
+		return this.#pauseReasons.size > 0;
 	}
 
 	// --- Queue ---
@@ -408,7 +412,7 @@ export class TileLoader {
 
 		// While paused only precache work may start; viewport-only tiles wait for `resume()`.
 		const selected = Array.from(this.#queue.values())
-			.filter((task) => !this.#paused || task.precache)
+			.filter((task) => !this.isPaused || task.precache)
 			.sort((a, b) => {
 				if (a.active !== b.active) {
 					return a.active ? -1 : 1;

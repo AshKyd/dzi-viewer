@@ -17,6 +17,7 @@
 		DEFAULT_MAX_DPR,
 		getTilesForViewport
 	} from '../../tiling.js';
+	import { resolveViewportTarget } from '../../transition.js';
 	import type {
 		DziDescriptor,
 		Point,
@@ -35,13 +36,22 @@
 		getFitViewport as computeFitViewport,
 		resolveStageAndImageBounds,
 		screenToStage as convertScreenToStage,
+		stageRectToScreen as convertStageRectToScreen,
+		stageRectToStyle as convertStageRectToStyle,
 		stageToScreen as convertStageToScreen
 	} from '../../viewport.js';
-	import type { DziViewerProps } from './dziViewerTypes.js';
+	import type {
+		DziViewerProps,
+		DziViewerSnippetContext,
+		ViewerLifecycleEvent,
+		ViewerLifecycleListener
+	} from './dziViewerTypes.js';
 	import { attachTileImage } from './tileImageAction.js';
 
 	let {
-		source,
+		source = null,
+		initialView,
+		children,
 		x = $bindable(0),
 		y = $bindable(0),
 		zoom = $bindable(1),
@@ -81,8 +91,45 @@
 	// Deliberately not reactive: `bumpCacheVersion()` re-runs the render plan when this changes.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const opaqueTileKeys = new Set<string>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const lifecycleListeners = new Set<ViewerLifecycleListener>();
 
 	let pendingCacheVersionFrame: number | undefined;
+	let hasAppliedInitialView = false;
+
+	function emitLifecycle(event: ViewerLifecycleEvent): void {
+		Array.from(lifecycleListeners).forEach((listener) => {
+			try {
+				listener(event);
+			} catch (error) {
+				console.error('[dzi-viewer] Viewer lifecycle listener threw:', error);
+			}
+		});
+	}
+
+	/**
+	 * Applies `initialView` once per `source` as soon as both `descriptor` and non-zero `size` exist,
+	 * before tile loads are scheduled for the default `(0, 0, zoom=1)` viewport.
+	 */
+	function applyInitialViewIfReady(descriptor: DziDescriptor, size: Size): void {
+		if (hasAppliedInitialView || size.width <= 0 || size.height <= 0) {
+			return;
+		}
+		const target = untrack(() => initialView);
+		if (!target) {
+			return;
+		}
+		const stage = resolveStageAndImageBounds(
+			descriptor,
+			untrack(() => stageSize),
+			untrack(() => imageBounds)
+		);
+		const resolved = resolveViewportTarget(target, stage.imageBounds, size);
+		x = resolved.x;
+		y = resolved.y;
+		zoom = resolved.zoom;
+		hasAppliedInitialView = true;
+	}
 
 	/**
 	 * Marks the cache as changed so the render plan is rebuilt.
@@ -268,9 +315,11 @@
 		});
 	});
 
-	// Dispose loader on unmount so pending precache promises settle cleanly.
+	// Dispose loader and notify lifecycle listeners on unmount.
 	$effect(() => {
 		return () => {
+			emitLifecycle({ type: 'destroy' });
+			lifecycleListeners.clear();
 			loader.dispose();
 			if (pendingCacheVersionFrame !== undefined) {
 				cancelAnimationFrame(pendingCacheVersionFrame);
@@ -318,7 +367,12 @@
 				const nextWidth = Math.max(0, width);
 				const nextHeight = Math.max(0, height);
 				if (nextWidth !== containerSize.width || nextHeight !== containerSize.height) {
-					containerSize = { width: nextWidth, height: nextHeight };
+					const nextSize = { width: nextWidth, height: nextHeight };
+					containerSize = nextSize;
+					if (dzi) {
+						applyInitialViewIfReady(dzi, nextSize);
+					}
+					emitLifecycle({ type: 'resize', containerSize: nextSize });
 				}
 			});
 
@@ -357,9 +411,19 @@
 		displayedLayers = [];
 		hasPendingTileChanges = false;
 		lastActiveRequestSignature = '';
+		heldLevel = undefined;
+		hasAppliedInitialView = false;
 		sourceId = `source-${sourceCounter}`;
 		dzi = null;
 		bumpCacheVersion();
+
+		if (sourceCounter > 1) {
+			emitLifecycle({ type: 'source-change' });
+		}
+
+		if (!currentSource) {
+			return;
+		}
 
 		loadDzi(currentSource, {
 			signal: controller.signal,
@@ -370,7 +434,12 @@
 					return;
 				}
 				dzi = descriptor;
+				applyInitialViewIfReady(
+					descriptor,
+					untrack(() => containerSize)
+				);
 				onLoad?.(descriptor);
+				emitLifecycle({ type: 'load', dzi: descriptor });
 			})
 			.catch((error: unknown) => {
 				if (controller.signal.aborted) {
@@ -382,6 +451,13 @@
 		return () => {
 			controller.abort();
 		};
+	});
+
+	// Fallback for non-ResizeObserver size updates (e.g. bound `containerSize` in tests): frame before tiles load.
+	$effect(() => {
+		if (dzi && hasContainerSize && !hasAppliedInitialView) {
+			applyInitialViewIfReady(dzi, containerSize);
+		}
 	});
 
 	// Remap cached tile stage rectangles if stageSize or imageBounds changes after tiles are cached.
@@ -465,7 +541,49 @@
 		return `translate3d(${tx}px, ${ty}px, 0) scale(${scaleX}, ${scaleY})`;
 	}
 
+	const snippetContext = $derived<DziViewerSnippetContext>({
+		viewport: effectiveViewport,
+		containerSize,
+		dzi,
+		imageBounds: resolvedStage?.imageBounds ?? null,
+		stageToScreen: (point) => convertStageToScreen(point, effectiveViewport, containerSize),
+		screenToStage: (point) => convertScreenToStage(point, effectiveViewport, containerSize),
+		stageRectToScreen: (rect) => convertStageRectToScreen(rect, effectiveViewport, containerSize),
+		stageRectToStyle: (rect) => convertStageRectToStyle(rect, effectiveViewport, containerSize)
+	});
+
 	// --- Exported methods (see `DziViewerMethods`) ---
+
+	export function setViewport(viewport: Partial<Viewport>): void {
+		if (viewport.x !== undefined) {
+			x = viewport.x;
+		}
+		if (viewport.y !== undefined) {
+			y = viewport.y;
+		}
+		if (viewport.zoom !== undefined) {
+			zoom = viewport.zoom;
+		}
+	}
+
+	export function getViewport(): Viewport {
+		return untrack(() => effectiveViewport);
+	}
+
+	export function getImageBounds(): Rect | null {
+		return untrack(() => resolvedStage?.imageBounds ?? null);
+	}
+
+	export function getContainerSize(): Size {
+		return untrack(() => containerSize);
+	}
+
+	export function subscribe(listener: ViewerLifecycleListener): () => void {
+		lifecycleListeners.add(listener);
+		return () => {
+			lifecycleListeners.delete(listener);
+		};
+	}
 
 	/**
 	 * Computes a viewport that fits `bounds` inside the current container (defaults to the loaded image's bounds).
@@ -544,12 +662,12 @@
 		return convertScreenToStage(point, effectiveViewport, containerSize);
 	}
 
-	export function pauseLoading(): void {
-		loader.pause();
+	export function pauseLoading(reason?: string): void {
+		loader.pause(reason);
 	}
 
-	export function resumeLoading(): void {
-		loader.resume();
+	export function resumeLoading(reason?: string): void {
+		loader.resume(reason);
 	}
 
 	export function isLoadingPaused(): boolean {
@@ -599,6 +717,11 @@
 			{/each}
 		</div>
 	{/each}
+	{#if children}
+		<div class="dzi-overlay-layer">
+			{@render children(snippetContext)}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -608,6 +731,13 @@
 		width: 100%;
 		height: 100%;
 		contain: layout paint;
+	}
+
+	.dzi-overlay-layer {
+		position: absolute;
+		inset: 0;
+		z-index: 1000;
+		pointer-events: none;
 	}
 
 	.dzi-level {

@@ -72,6 +72,10 @@
 		"storybook": "storybook dev -p 6006 --ci",
 		"build-storybook": "storybook build"
 	},
+	"dependencies": {
+		"d3-ease": "^3.0.1",
+		"d3-interpolate": "^3.0.1"
+	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "^5.6.0",
 		"@eslint/js": "^10.0.1",
@@ -85,6 +89,8 @@
 		"@sveltejs/kit": "^3.2.0",
 		"@sveltejs/package": "^3.0.2",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@types/d3-ease": "^3.0.2",
+		"@types/d3-interpolate": "^3.0.4",
 		"@types/node": "^24",
 		"@vitest/browser-playwright": "^5.0.5",
 		"@vitest/coverage-v8": "^5.0.5",

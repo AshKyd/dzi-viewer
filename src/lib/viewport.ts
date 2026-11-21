@@ -6,7 +6,8 @@ import type {
 	Size,
 	Viewport,
 	ViewportConstraints,
-	ViewportFitOptions
+	ViewportFitOptions,
+	ViewportTolerance
 } from './types.js';
 
 interface NormalisedPadding {
@@ -229,6 +230,40 @@ export function screenToStage(point: Point, viewport: Viewport, containerSize: S
 		x: viewport.x + (point.x - containerSize.width / 2) / viewport.zoom,
 		y: viewport.y + (point.y - containerSize.height / 2) / viewport.zoom
 	};
+}
+
+/**
+ * Projects a stage-space rectangle into CSS pixels relative to the viewer container.
+ */
+export function stageRectToScreen(rect: Rect, viewport: Viewport, containerSize: Size): Rect {
+	const topLeft = stageToScreen({ x: rect.x, y: rect.y }, viewport, containerSize);
+	return {
+		x: topLeft.x,
+		y: topLeft.y,
+		width: rect.width * viewport.zoom,
+		height: rect.height * viewport.zoom
+	};
+}
+
+/**
+ * Returns an inline CSS style string positioning an overlay element over `rect` in stage space.
+ */
+export function stageRectToStyle(rect: Rect, viewport: Viewport, containerSize: Size): string {
+	const { x, y, width, height } = stageRectToScreen(rect, viewport, containerSize);
+	return `position: absolute; top: 0; left: 0; transform: translate3d(${x}px, ${y}px, 0); width: ${width}px; height: ${height}px;`;
+}
+
+/**
+ * Compares two viewports within optional position (stage units) and relative zoom tolerances.
+ */
+export function viewportsEqual(a: Viewport, b: Viewport, tolerance?: ViewportTolerance): boolean {
+	const positionTolerance = tolerance?.position ?? 0.01;
+	const zoomTolerance = (tolerance?.zoom ?? 1e-6) * Math.max(1, a.zoom, b.zoom);
+	return (
+		Math.abs(a.x - b.x) < positionTolerance &&
+		Math.abs(a.y - b.y) < positionTolerance &&
+		Math.abs(a.zoom - b.zoom) < zoomTolerance
+	);
 }
 
 export function rectIntersects(a: Rect, b: Rect, epsilon = 0): boolean {

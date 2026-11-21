@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { EMPTY_PRECACHE_RESULT } from '../../precache.js';
 	import type {
 		DziDescriptor,
@@ -12,9 +14,12 @@
 	} from '../../types.js';
 	import { clampViewport } from '../../viewport.js';
 	import DziViewer from '../DziViewer/DziViewer.svelte';
-	import type { DziViewerMethods } from '../DziViewer/dziViewerTypes.js';
+	import type {
+		DziViewerMethods,
+		ViewerLifecycleEvent,
+		ViewerLifecycleListener
+	} from '../DziViewer/dziViewerTypes.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
-	import { fade } from 'svelte/transition';
 	import {
 		computePinchStep,
 		computeWheelZoomMultiplier,
@@ -44,18 +49,43 @@
 		keyboardZoomFactor = 1.25,
 		cooperativeGestures = false,
 		cooperativeGestureMessages,
+		loadDebounceMs = 0,
 		onInteract,
 		...viewerProps
 	}: PanZoomProps = $props();
 
+	const DEBOUNCE_PAUSE_REASON = 'panzoom-debounce';
+
 	let rootEl: HTMLDivElement | undefined = $state();
 	let viewer: DziViewerMethods | undefined = $state();
 	let isDragging = $state(false);
+	let loadDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-	// Pointer positions are gesture bookkeeping read only inside event handlers, so they need no reactivity.
+	// Pointer positions and lifecycle subscribers are bookkeeping only, so they need no reactivity.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const activePointers = new Map<number, Point>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const lifecycleListeners = new Set<ViewerLifecycleListener>();
 	let lastAppliedViewport: Viewport = { x: Number.NaN, y: Number.NaN, zoom: Number.NaN };
+
+	function emitLifecycle(event: ViewerLifecycleEvent): void {
+		Array.from(lifecycleListeners).forEach((listener) => {
+			try {
+				listener(event);
+			} catch (error) {
+				console.error('[dzi-viewer] Viewer lifecycle listener threw:', error);
+			}
+		});
+	}
+
+	function clearLoadDebounce(): void {
+		if (loadDebounceTimer === undefined) {
+			return;
+		}
+		clearTimeout(loadDebounceTimer);
+		loadDebounceTimer = undefined;
+		viewer?.resumeLoading(DEBOUNCE_PAUSE_REASON);
+	}
 
 	const interactive = $derived(!disabled && (panEnabled || zoomEnabled));
 	const canPan = $derived(!disabled && panEnabled);
@@ -78,7 +108,34 @@
 		hintTimer = setTimeout(() => (hintMessage = null), HINT_DURATION_MS);
 	}
 
-	$effect(() => () => clearTimeout(hintTimer));
+	// Forward inner DziViewer lifecycle events (except `destroy`, emitted on PanZoom unmount so it fires once).
+	$effect(() => {
+		const currentViewer = viewer;
+		if (!currentViewer) {
+			return;
+		}
+		return currentViewer.subscribe((event) => {
+			if (event.type !== 'destroy') {
+				emitLifecycle(event);
+			}
+		});
+	});
+
+	// If `loadDebounceMs` is disabled mid-debounce, release the debounce pause immediately.
+	$effect(() => {
+		if (loadDebounceMs <= 0) {
+			clearLoadDebounce();
+		}
+	});
+
+	$effect(() => {
+		return () => {
+			clearTimeout(hintTimer);
+			clearLoadDebounce();
+			emitLifecycle({ type: 'destroy' });
+			lifecycleListeners.clear();
+		};
+	});
 
 	// In cooperative mode the browser scrolls the page for one finger (`touch-action: pan-x pan-y`).
 	// Pointer events can't stop that, so a non-passive `touchmove` blocks it once a second finger is down.
@@ -147,7 +204,16 @@
 		x = next.x;
 		y = next.y;
 		zoom = next.zoom;
+		if (loadDebounceMs > 0) {
+			viewer?.pauseLoading(DEBOUNCE_PAUSE_REASON);
+			clearTimeout(loadDebounceTimer);
+			loadDebounceTimer = setTimeout(() => {
+				loadDebounceTimer = undefined;
+				viewer?.resumeLoading(DEBOUNCE_PAUSE_REASON);
+			}, loadDebounceMs);
+		}
 		onInteract?.(next);
+		emitLifecycle({ type: 'interact', viewport: next });
 	}
 
 	/** Pans by a screen-space delta (positive moves the image right/down). */
@@ -335,6 +401,41 @@
 		}
 	}
 
+	export function setViewport(viewport: Partial<Viewport>): void {
+		if (viewer) {
+			viewer.setViewport(viewport);
+			return;
+		}
+		if (viewport.x !== undefined) {
+			x = viewport.x;
+		}
+		if (viewport.y !== undefined) {
+			y = viewport.y;
+		}
+		if (viewport.zoom !== undefined) {
+			zoom = viewport.zoom;
+		}
+	}
+
+	export function getViewport(): Viewport {
+		return viewer?.getViewport() ?? untrack(() => currentViewport());
+	}
+
+	export function getImageBounds(): Rect | null {
+		return viewer?.getImageBounds() ?? null;
+	}
+
+	export function getContainerSize(): Size {
+		return viewer?.getContainerSize() ?? untrack(() => containerSize);
+	}
+
+	export function subscribe(listener: ViewerLifecycleListener): () => void {
+		lifecycleListeners.add(listener);
+		return () => {
+			lifecycleListeners.delete(listener);
+		};
+	}
+
 	export function getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null {
 		return viewer?.getFitViewport(bounds, options) ?? null;
 	}
@@ -368,12 +469,12 @@
 		return viewer?.screenToStage(point) ?? point;
 	}
 
-	export function pauseLoading(): void {
-		viewer?.pauseLoading();
+	export function pauseLoading(reason?: string): void {
+		viewer?.pauseLoading(reason);
 	}
 
-	export function resumeLoading(): void {
-		viewer?.resumeLoading();
+	export function resumeLoading(reason?: string): void {
+		viewer?.resumeLoading(reason);
 	}
 
 	export function isLoadingPaused(): boolean {

@@ -7,20 +7,17 @@ export const INSTALL_COMMAND = 'npm install dzi-viewer';
 
 export const SVELTE_EXAMPLE = `<script lang="ts">
 	import { PanZoom } from 'dzi-viewer';
-
-	let x = $state(0);
-	let y = $state(0);
-	let zoom = $state(0.1);
 </script>
 
 <div style="width: 100%; height: 600px">
-	<PanZoom source="/images/photo.dzi" alt="Harbour at dusk" bind:x bind:y bind:zoom />
+	<PanZoom source="/images/photo.dzi" initialView="fit" alt="Harbour at dusk" />
 </div>`;
 
 export const VANILLA_EXAMPLE = `import { createPanZoom } from 'dzi-viewer/vanilla';
 
 const viewer = createPanZoom(document.querySelector('#viewer'), {
 	source: '/images/photo.dzi',
+	initialView: 'fit',
 	alt: 'Harbour at dusk'
 });
 
