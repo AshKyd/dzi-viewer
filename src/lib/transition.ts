@@ -1,4 +1,4 @@
-import { easeCubicOut } from 'd3-ease';
+import { easeCubicInOut, easeCubicOut } from 'd3-ease';
 import { interpolateZoom, type ZoomInterpolator, type ZoomView } from 'd3-interpolate';
 import type {
 	EasingFunction,
@@ -26,6 +26,9 @@ const zoomInterpolator = interpolateZoom as ZoomInterpolatorFactory;
 
 /** Default easing for timed transitions (`d3-ease`'s `easeCubicOut`). */
 export const easeOutCubic: EasingFunction = easeCubicOut;
+
+/** Smooth accelerate-and-decelerate easing (`d3-ease`'s `easeCubicInOut`). */
+export const easeInOutCubic: EasingFunction = easeCubicInOut;
 
 export interface TrackSegmentMatch {
 	readonly fromIndex: number;

@@ -178,7 +178,7 @@ Pure helpers exported for custom animation loops or overlays:
 - `resolveViewportTarget(target, imageBounds, containerSize)` / `isViewportTargetExplicit(target)`
 - `interpolateViewport(from, to, progress, options?)` / `interpolateTarget(from, to, imageBounds, containerSize, progress, options?)`
 - `findTrackSegment(stops, progress)` / `sampleViewportTrack(stops, progress, imageBounds, containerSize, options?)`
-- `easeOutCubic` (`d3-ease`'s `easeCubicOut`)
+- `easeOutCubic` (`d3-ease`'s `easeCubicOut`) / `easeInOutCubic` (`d3-ease`'s `easeCubicInOut`)
 
 ## Pausing tile downloads
 

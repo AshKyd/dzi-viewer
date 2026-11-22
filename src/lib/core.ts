@@ -55,6 +55,7 @@ export {
 } from './viewport.js';
 
 export {
+	easeInOutCubic,
 	easeOutCubic,
 	findTrackSegment,
 	interpolateTarget,

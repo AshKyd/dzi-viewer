@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	easeInOutCubic,
 	easeOutCubic,
 	findTrackSegment,
 	interpolateTarget,
@@ -99,15 +100,21 @@ describe('transition utilities', () => {
 		expect(steeper.zoom).toBeLessThan(mid.zoom);
 	});
 
-	it('applies custom easing in interpolateViewport and easeOutCubic matches cubic-out', () => {
+	it('applies custom easing in interpolateViewport and matches cubic easings', () => {
 		expect(easeOutCubic(0)).toBe(0);
 		expect(easeOutCubic(0.5)).toBeCloseTo(0.875);
 		expect(easeOutCubic(1)).toBe(1);
 
+		expect(easeInOutCubic(0)).toBe(0);
+		expect(easeInOutCubic(0.25)).toBeCloseTo(0.0625);
+		expect(easeInOutCubic(0.5)).toBeCloseTo(0.5);
+		expect(easeInOutCubic(0.75)).toBeCloseTo(0.9375);
+		expect(easeInOutCubic(1)).toBe(1);
+
 		const from = { x: 0, y: 0, zoom: 1 };
 		const to = { x: 1000, y: 0, zoom: 1 };
-		const eased = interpolateViewport(from, to, 0.5, { easing: easeOutCubic });
-		expect(eased.x).toBeCloseTo(875);
+		expect(interpolateViewport(from, to, 0.5, { easing: easeOutCubic }).x).toBeCloseTo(875);
+		expect(interpolateViewport(from, to, 0.25, { easing: easeInOutCubic }).x).toBeCloseTo(62.5);
 	});
 
 	it('resolves and interpolates target pairs via interpolateTarget', () => {
