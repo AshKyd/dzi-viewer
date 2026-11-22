@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0](https://github.com/AshKyd/dzi-viewer/compare/v0.1.0...v0.2.0) (2026-11-22)
+
+### Features
+
+* add camera transitions, overlays, initialView, and gesture load debouncing ([eaf7c2a](https://github.com/AshKyd/dzi-viewer/commit/eaf7c2ae4cf3587903b67baec38ae26d4d70d124))
+
 ## 0.1.0 (2026-11-20)
 
 ### Features
