@@ -136,11 +136,12 @@ describe('transition utilities', () => {
 			toIndex: 1,
 			localProgress: 0.5
 		});
-		expect(findTrackSegment(stops, 0.7)).toMatchObject({
+		const secondSegment = findTrackSegment(stops, 0.7);
+		expect(secondSegment).toMatchObject({
 			fromIndex: 1,
-			toIndex: 2,
-			localProgress: 0.5
+			toIndex: 2
 		});
+		expect(secondSegment?.localProgress).toBeCloseTo(0.5);
 		expect(findTrackSegment(stops, 2)).toMatchObject({
 			fromIndex: 2,
 			toIndex: 2,
