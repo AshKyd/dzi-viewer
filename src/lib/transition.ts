@@ -1,5 +1,5 @@
 import { easeCubicOut } from 'd3-ease';
-import { interpolateZoom } from 'd3-interpolate';
+import { interpolateZoom, type ZoomInterpolator, type ZoomView } from 'd3-interpolate';
 import type {
 	EasingFunction,
 	InterpolateViewportOptions,
@@ -12,6 +12,17 @@ import type {
 import { getFillViewport, getFitViewport } from './viewport.js';
 
 const DEFAULT_FLY_REFERENCE_SPAN = 1000;
+
+/**
+ * `@types/d3-interpolate` declares `.rho()` on `ZoomInterpolator` instead of on the
+ * `interpolateZoom` factory itself, even though `d3-interpolate` defines `interpolateZoom.rho(rho)`.
+ */
+interface ZoomInterpolatorFactory {
+	(a: ZoomView, b: ZoomView): ZoomInterpolator;
+	rho(rho: number): ZoomInterpolatorFactory;
+}
+
+const zoomInterpolator = interpolateZoom as ZoomInterpolatorFactory;
 
 /** Default easing for timed transitions (`d3-ease`'s `easeCubicOut`). */
 export const easeOutCubic: EasingFunction = easeCubicOut;
@@ -114,8 +125,8 @@ function interpolateFly(
 
 	const baseInterpolator =
 		rho !== undefined && Number.isFinite(rho) && rho > 0
-			? interpolateZoom.rho(rho)
-			: interpolateZoom;
+			? zoomInterpolator.rho(rho)
+			: zoomInterpolator;
 
 	const fly = baseInterpolator(
 		[from.x, from.y, referenceSpan / from.zoom],

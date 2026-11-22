@@ -24,10 +24,10 @@ export interface DziViewerSnippetContext {
 	readonly containerSize: Size;
 	readonly dzi: DziDescriptor | null;
 	readonly imageBounds: Rect | null;
-	stageToScreen(point: Point): Point;
-	screenToStage(point: Point): Point;
-	stageRectToScreen(rect: Rect): Rect;
-	stageRectToStyle(rect: Rect): string;
+	readonly stageToScreen: (point: Point) => Point;
+	readonly screenToStage: (point: Point) => Point;
+	readonly stageRectToScreen: (rect: Rect) => Rect;
+	readonly stageRectToStyle: (rect: Rect) => string;
 }
 
 export type ViewerLifecycleEvent =

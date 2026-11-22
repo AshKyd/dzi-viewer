@@ -541,15 +541,17 @@
 		return `translate3d(${tx}px, ${ty}px, 0) scale(${scaleX}, ${scaleY})`;
 	}
 
-	const snippetContext = $derived<DziViewerSnippetContext>({
+	const snippetContext: DziViewerSnippetContext = $derived({
 		viewport: effectiveViewport,
 		containerSize,
 		dzi,
 		imageBounds: resolvedStage?.imageBounds ?? null,
-		stageToScreen: (point) => convertStageToScreen(point, effectiveViewport, containerSize),
-		screenToStage: (point) => convertScreenToStage(point, effectiveViewport, containerSize),
-		stageRectToScreen: (rect) => convertStageRectToScreen(rect, effectiveViewport, containerSize),
-		stageRectToStyle: (rect) => convertStageRectToStyle(rect, effectiveViewport, containerSize)
+		stageToScreen: (point: Point) => convertStageToScreen(point, effectiveViewport, containerSize),
+		screenToStage: (point: Point) => convertScreenToStage(point, effectiveViewport, containerSize),
+		stageRectToScreen: (rect: Rect) =>
+			convertStageRectToScreen(rect, effectiveViewport, containerSize),
+		stageRectToStyle: (rect: Rect) =>
+			convertStageRectToStyle(rect, effectiveViewport, containerSize)
 	});
 
 	// --- Exported methods (see `DziViewerMethods`) ---
