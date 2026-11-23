@@ -647,7 +647,11 @@ export function createCamera(
 				const elapsed = Math.max(0, frameTime - startTime);
 				const rawProgress = Math.min(1, elapsed / effectiveDuration);
 
-				if (rawProgress < 1 && minFrameIntervalMs > 0 && frameTime - lastRenderTime < minFrameIntervalMs) {
+				if (
+					rawProgress < 1 &&
+					minFrameIntervalMs > 0 &&
+					frameTime - lastRenderTime < minFrameIntervalMs
+				) {
 					animation.frameId = requestAnimationFrame(step);
 					return;
 				}
