@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0](https://github.com/AshKyd/dzi-viewer/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+### Features
+
+* limit fps ([086bc42](https://github.com/AshKyd/dzi-viewer/commit/086bc42496a3d57c356ff01547393392e1b6564a))
+
 ## [0.3.0](https://github.com/AshKyd/dzi-viewer/compare/v0.2.0...v0.3.0) (2026-11-23)
 
 ### Features
