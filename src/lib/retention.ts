@@ -239,13 +239,15 @@ export function computeRenderPlan({
 			.filter(([, tiles]) => tiles.length > 0)
 	);
 
-	// Prefer fallback levels closest in resolution to the optimal level; break ties in favour of sharper levels.
+	// Prefer already-loaded sharper levels (closest above optimal first) over coarser blurry levels
+	// (closest below optimal first) so loaded high-resolution tiles appear immediately during zoom transitions.
 	const sortedFallbackLevels = Array.from(fallbacksByLevel.keys()).sort((a, b) => {
-		const diff = Math.abs(a - optimalLevel) - Math.abs(b - optimalLevel);
-		if (diff !== 0) {
-			return diff;
+		const aFiner = a > optimalLevel;
+		const bFiner = b > optimalLevel;
+		if (aFiner !== bFiner) {
+			return aFiner ? -1 : 1;
 		}
-		return b - a;
+		return Math.abs(a - optimalLevel) - Math.abs(b - optimalLevel);
 	});
 
 	// Walk closest-to-farthest, stopping once 100% of uncovered optimal areas are covered by opaque tiles.

@@ -156,6 +156,7 @@ The vanilla controller also has `update`, `getState`, and `destroy`.
 - `rho`: curvature factor for `'fly'` transitions (`interpolateZoom.rho(rho)`).
 - `easing`: easing for timed `goTo` transitions (default `easeOutCubic`). Not inherited by `scrub`/`scrubTrack`, which default to linear.
 - `duration` (default `600`): transition duration in milliseconds.
+- `maxFps`: optional maximum frame rate (frames per second) for timed `goTo` animations (uncapped by default).
 - `respectReducedMotion` (default `true`): snap immediately when `prefers-reduced-motion: reduce` matches.
 - `refitOnResize` (default `false`): re-frame the last non-explicit `goTo` target or `scrub`/`scrubTrack` position when the viewer resizes. Accepts a boolean or `() => boolean` getter.
 - `settleDelayMs` (default `120`): delay after the last `scrub`/`scrubTrack` call before releasing holds.
@@ -165,7 +166,7 @@ The vanilla controller also has `update`, `getState`, and `destroy`.
 `DziCamera` properties and methods:
 
 - `isTransitioning`: read-only boolean, `true` while a `goTo` animation is running or a scrub is waiting to settle.
-- `goTo(target, options?)`: animates (or snaps if `duration: 0` or reduced motion is enabled) to any `ViewportTarget`. Non-explicit targets called before the DZI or container size is ready queue and snap once both are known. `options` (`TransitionOptions`) overrides `duration`, `curve`, `easing`, `rho`, `respectReducedMotion`, `pauseLoading`, `holdResolution`, `precache`, and accepts an `AbortSignal` via `signal`. Returns `Promise<{ completed, cancelled, viewport }>`.
+- `goTo(target, options?)`: animates (or snaps if `duration: 0` or reduced motion is enabled) to any `ViewportTarget`. Non-explicit targets called before the DZI or container size is ready queue and snap once both are known. `options` (`TransitionOptions`) overrides `duration`, `maxFps`, `curve`, `easing`, `rho`, `respectReducedMotion`, `pauseLoading`, `holdResolution`, `precache`, and accepts an `AbortSignal` via `signal`. Returns `Promise<{ completed, cancelled, viewport }>`.
 - `fitBounds(bounds?, options?)` / `fillBounds(bounds?, options?)`: shorthands for `goTo`; `options` also accepts `padding`.
 - `scrub(from, to, progress, options?)`: interpolates between two targets at `progress` in `[0, 1]` (linear by default), holds resolution and downloads while scrubbing, precaches once per segment (`precache: 'to' | 'both' | false`), and releases holds after `settleDelayMs`. `options` (`ScrubOptions`) overrides `curve`, `easing`, `rho`, `settleDelayMs`, `pauseLoading`, `holdResolution`, and `precache`. Returns the applied `Viewport`, or `null` if the viewer is not ready.
 - `scrubTrack(stops, progress, options?)`: scrubs across an array of `{ at, target, curve?, easing? }` stops. Returns `Viewport | null`.

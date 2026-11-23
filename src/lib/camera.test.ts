@@ -209,6 +209,37 @@ describe('createCamera', () => {
 		expect(transitions).toEqual([true, false]);
 	});
 
+	it('throttles timed goTo renders to maxFps while still landing cleanly on the final frame', async () => {
+		const raf = installManualRaf();
+		const mock = createMockViewer();
+		const camera = createCamera(mock.viewer, { duration: 100, maxFps: 30 });
+
+		const promise = camera.goTo({ x: 500, y: 250, zoom: 2 });
+
+		// First frame renders immediately at 16ms.
+		raf.step(16);
+		expect(mock.setViewportCalls).toHaveLength(1);
+
+		// 32ms is only 16ms later (< ~31.3ms threshold for 30fps), so it is skipped.
+		raf.step(32);
+		expect(mock.setViewportCalls).toHaveLength(1);
+
+		// 49ms is 33ms after the previous render, so it renders.
+		raf.step(49);
+		expect(mock.setViewportCalls).toHaveLength(2);
+
+		// 66ms is only 17ms later, so it is skipped.
+		raf.step(66);
+		expect(mock.setViewportCalls).toHaveLength(2);
+
+		// Final frame at 100ms always renders and completes cleanly.
+		raf.step(100);
+		const result = await promise;
+		expect(result.completed).toBe(true);
+		expect(mock.setViewportCalls).toHaveLength(3);
+		expect(mock.viewer.getViewport()).toEqual({ x: 500, y: 250, zoom: 2 });
+	});
+
 	it('interrupts mid-flight transitions cleanly, aborting stale precache without dropping holds', async () => {
 		const raf = installManualRaf();
 		const mock = createMockViewer();

@@ -154,6 +154,59 @@ describe('coverage subtraction and zero-blank fallback retention', () => {
 		expect(plan.layers.map((l) => l.level)).toEqual([8, 10]);
 	});
 
+	it('prefers already-loaded sharper tiles over closer coarser tiles while zooming in', () => {
+		const largerDzi = parseDziJson(
+			{
+				Image: { Format: 'jpg', Overlap: 0, TileSize: 256, Size: { Width: 2048, Height: 2048 } }
+			},
+			{ tilesUrl: 'https://example.com/dzi_files/' }
+		);
+		const largerBounds = { x: 0, y: 0, width: 2048, height: 2048 };
+		const cache = new TileCache();
+
+		// Coarse level 8 (1 tile) covering the entire image, already mounted and opaque.
+		const coarseSelection = getTilesForViewport({
+			dzi: largerDzi,
+			imageBounds: largerBounds,
+			viewport: { x: 1024, y: 1024, zoom: 0.125 },
+			containerSize: { width: 256, height: 256 },
+			levelOverride: 8
+		});
+		coarseSelection.tiles.forEach((spec) => cache.setReady(spec));
+
+		// Preloaded destination tiles at level 11 (3 levels above coarse, 2 levels above optimal level 9).
+		const sharpSelection = getTilesForViewport({
+			dzi: largerDzi,
+			imageBounds: largerBounds,
+			viewport: { x: 1024, y: 1024, zoom: 1 },
+			containerSize: { width: 512, height: 512 },
+			levelOverride: 11
+		});
+		sharpSelection.tiles.forEach((spec) => cache.setReady(spec));
+
+		// Mid-zoom at optimal level 9 (not loaded yet): level 8 is 1 level below, level 11 is 2 levels above.
+		const midZoomSelection = getTilesForViewport({
+			dzi: largerDzi,
+			imageBounds: largerBounds,
+			viewport: { x: 1024, y: 1024, zoom: 0.25 },
+			containerSize: { width: 512, height: 512 },
+			levelOverride: 9
+		});
+
+		const opaqueKeys = new Set<string>(coarseSelection.tiles.map((tile) => tile.key));
+		const plan = computeRenderPlan({
+			dzi: largerDzi,
+			optimalLevel: 9,
+			optimalTiles: midZoomSelection.tiles,
+			visibleBounds: midZoomSelection.visibleBounds,
+			cache,
+			opaqueTileKeys: opaqueKeys
+		});
+
+		// Level 11 renders above level 8 instead of being masked by the closer-but-coarser level 8 tile.
+		expect(plan.layers.map((layer) => layer.level)).toEqual([8, 11]);
+	});
+
 	it('keeps underlying fallback tiles mounted while optimal tiles are still fading in', () => {
 		const cache = new TileCache();
 

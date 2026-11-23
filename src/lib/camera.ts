@@ -39,6 +39,8 @@ export interface CameraOptions {
 	readonly rho?: number;
 	/** Default transition duration in ms for `goTo` / `fitBounds` / `fillBounds` (defaults to `600`). */
 	readonly duration?: number;
+	/** Optional maximum frame rate (frames per second) for timed `goTo` animations (uncapped by default). */
+	readonly maxFps?: number;
 	/** Snap immediately when the user prefers reduced motion (defaults to `true`). */
 	readonly respectReducedMotion?: boolean;
 	/**
@@ -60,6 +62,7 @@ export interface CameraOptions {
 
 export interface TransitionOptions {
 	readonly duration?: number;
+	readonly maxFps?: number;
 	readonly curve?: TransitionCurve;
 	readonly easing?: EasingFunction;
 	readonly rho?: number;
@@ -600,6 +603,12 @@ export function createCamera(
 		const curve = options?.curve ?? cameraOptions.curve ?? 'direct';
 		const easing = options?.easing ?? cameraOptions.easing ?? easeOutCubic;
 		const rho = options?.rho ?? cameraOptions.rho;
+		const maxFps = options?.maxFps ?? cameraOptions.maxFps;
+		const frameIntervalMs =
+			maxFps !== undefined && Number.isFinite(maxFps) && maxFps > 0 ? 1000 / maxFps : 0;
+		// Allow a small timing tolerance so minor rAF jitter on 60Hz/120Hz displays doesn't drop a 30fps cap to 20fps.
+		const minFrameIntervalMs =
+			frameIntervalMs > 0 ? frameIntervalMs - Math.min(2, frameIntervalMs * 0.1) : 0;
 
 		applyHolds(viewer, wantPause, wantHold);
 		setTransitioning(true);
@@ -628,6 +637,7 @@ export function createCamera(
 			activeAnimation = animation;
 
 			const startTime = nowMs();
+			let lastRenderTime = Number.NEGATIVE_INFINITY;
 
 			const step = (frameTime: number) => {
 				if (activeAnimation !== animation) {
@@ -636,6 +646,13 @@ export function createCamera(
 
 				const elapsed = Math.max(0, frameTime - startTime);
 				const rawProgress = Math.min(1, elapsed / effectiveDuration);
+
+				if (rawProgress < 1 && minFrameIntervalMs > 0 && frameTime - lastRenderTime < minFrameIntervalMs) {
+					animation.frameId = requestAnimationFrame(step);
+					return;
+				}
+				lastRenderTime = frameTime;
+
 				const next = interpolateViewport(from, to, rawProgress, {
 					curve,
 					easing,
