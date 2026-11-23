@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0](https://github.com/AshKyd/dzi-viewer/compare/v0.2.0...v0.3.0) (2026-11-23)
+
+### Features
+
+* export easeinout ([d0a32fe](https://github.com/AshKyd/dzi-viewer/commit/d0a32fe0c8fd749e3af51a9ad07b78d232baecc4))
+
 ## [0.2.0](https://github.com/AshKyd/dzi-viewer/compare/v0.1.0...v0.2.0) (2026-11-22)
 
 ### Features
