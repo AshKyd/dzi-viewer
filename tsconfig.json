@@ -9,6 +9,7 @@
 		".storybook/*.ts",
 		"vite.config.ts",
 		"vite.vanilla.config.ts",
+		"vite.worker.config.ts",
 		"vitest.shims.d.ts",
 		"prettier.config.js",
 		"eslint.config.js"

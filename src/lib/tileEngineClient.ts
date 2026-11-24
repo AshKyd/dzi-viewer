@@ -1,6 +1,6 @@
 import { EMPTY_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
-import TileEngineWorker from './tileEngine.worker.js?worker&inline';
+import { createTileEngineWorker } from './tileEngineWorkerFactory.js';
 import type {
 	EngineFrameSync,
 	EngineInboundMessage,
@@ -447,7 +447,7 @@ export function createTileEngineClient({
 }: CreateTileEngineClientOptions): TileEngineClient {
 	if (!hasCustomTileUrl && !loadImage && typeof Worker === 'function') {
 		try {
-			const worker = new TileEngineWorker();
+			const worker = createTileEngineWorker();
 			return new WorkerTileEngineClient(worker, onDelta);
 		} catch {
 			// Fall back to in-process engine when Workers are unavailable or blocked by CSP.
