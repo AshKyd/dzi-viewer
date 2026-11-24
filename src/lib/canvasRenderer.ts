@@ -1,3 +1,4 @@
+import { computeBackingSize, computeTileDrawRect } from './canvasGeometry.js';
 import { EMPTY_PRECACHE_RESULT } from './precache.js';
 import { createRenderSurface, type AnyCanvas, type RenderSurface } from './renderSurface.js';
 import { createTileEngineClient, type TileEngineClient } from './tileEngineClient.js';
@@ -9,25 +10,20 @@ import {
 	type TileEngineConfig,
 	type TileEngineDelta
 } from './tileEngineProtocol.js';
+import { TileFadeTracker } from './tileFade.js';
 import type { TileImageLoader } from './tileLoader.js';
 import { clampDpr, DEFAULT_MAX_DPR } from './tiling.js';
 import type {
-	CachedTile,
 	DziDescriptor,
 	PrecacheOptions,
 	PrecacheResult,
 	Rect,
-	RenderLevelLayer,
 	Size,
 	TileErrorEvent,
 	Viewport,
 	ViewportFitOptions
 } from './types.js';
 import { closeBitmap, nowMs } from './utils.js';
-import { stageToScreen } from './viewport.js';
-
-/** Safari hard-caps individual 2D canvas areas at 16,777,216 pixels (4096 × 4096). */
-export const SAFARI_MAX_CANVAS_PIXELS = 16_777_216;
 
 /** Default per-frame time budget (ms) for uploading decoded tile bitmaps to GPU textures. */
 export const DEFAULT_UPLOAD_BUDGET_MS = 4;
@@ -52,89 +48,12 @@ export interface CanvasRendererOptions extends CanvasRendererConfig {
 	readonly now?: () => number;
 }
 
-export interface BackingCanvasSize {
-	readonly width: number;
-	readonly height: number;
-	/** Effective backing-pixel scale relative to CSS pixels (after area clamping). */
-	readonly scale: number;
-}
-
 function isSameViewport(a: Viewport, b: Viewport): boolean {
 	return a.x === b.x && a.y === b.y && a.zoom === b.zoom;
 }
 
-/**
- * Computes physical canvas dimensions for `containerSize` at `dpr`, clamping total pixel area
- * to `maxPixels` so giant containers never exceed Safari's 16.7M pixel canvas limit.
- */
-export function computeBackingSize(
-	containerSize: Size,
-	dpr: number,
-	maxPixels = SAFARI_MAX_CANVAS_PIXELS
-): BackingCanvasSize {
-	if (containerSize.width <= 0 || containerSize.height <= 0) {
-		return { width: 0, height: 0, scale: 1 };
-	}
-
-	const desiredScale = Math.max(0.1, Number.isFinite(dpr) ? dpr : 1);
-	const rawWidth = containerSize.width * desiredScale;
-	const rawHeight = containerSize.height * desiredScale;
-	const area = rawWidth * rawHeight;
-	const clampFactor = area > maxPixels ? Math.sqrt(maxPixels / area) : 1;
-	const scale = desiredScale * clampFactor;
-
-	return {
-		width: Math.max(1, Math.round(containerSize.width * scale)),
-		height: Math.max(1, Math.round(containerSize.height * scale)),
-		scale
-	};
-}
-
-/**
- * Computes a tile's destination rectangle in canvas backing pixels.
- * Uses `tile.pixelRect` (which includes DZI overlap) so bitmaps map 1:1 without distortion.
- * When `snapEdges` is true (`overlap === 0`), outward edge rounding prevents 1px hairline seams.
- */
-export function computeTileDrawRect({
-	tile,
-	layer,
-	imageBounds,
-	viewport,
-	containerSize,
-	backingScale,
-	snapEdges
-}: {
-	readonly tile: Pick<CachedTile, 'pixelRect'>;
-	readonly layer: Pick<RenderLevelLayer, 'levelSize'>;
-	readonly imageBounds: Rect;
-	readonly viewport: Viewport;
-	readonly containerSize: Size;
-	readonly backingScale: number;
-	readonly snapEdges: boolean;
-}): Rect {
-	const screenOrigin = stageToScreen(
-		{ x: imageBounds.x, y: imageBounds.y },
-		viewport,
-		containerSize
-	);
-	const scaleX = (imageBounds.width * viewport.zoom) / layer.levelSize.width;
-	const scaleY = (imageBounds.height * viewport.zoom) / layer.levelSize.height;
-
-	const dx = (screenOrigin.x + tile.pixelRect.x * scaleX) * backingScale;
-	const dy = (screenOrigin.y + tile.pixelRect.y * scaleY) * backingScale;
-	const dw = tile.pixelRect.width * scaleX * backingScale;
-	const dh = tile.pixelRect.height * scaleY * backingScale;
-
-	if (!snapEdges) {
-		return { x: dx, y: dy, width: dw, height: dh };
-	}
-
-	const x0 = Math.floor(dx);
-	const y0 = Math.floor(dy);
-	const x1 = Math.ceil(dx + dw);
-	const y1 = Math.ceil(dy + dh);
-	return { x: x0, y: y0, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) };
-}
+/** Changes waiting for the next engine sync; later writes to a field replace earlier ones. */
+type PendingSync = { -readonly [K in keyof EngineFrameSync]?: EngineFrameSync[K] };
 
 /**
  * Main-thread WebGL2 / 2D canvas painter backed by an off-thread `TileEngine` Web Worker.
@@ -157,9 +76,7 @@ export class CanvasTileRenderer {
 	 * bitmaps remain here until evicted or cleared.
 	 */
 	readonly #bitmaps = new Map<string, ImageBitmap>();
-	readonly #tileFadeStart = new Map<string, number>();
-	readonly #opaqueTileKeys = new Set<string>();
-	readonly #pendingOpaqueForEngine = new Set<string>();
+	readonly #fade = new TileFadeTracker();
 
 	#engine: TileEngineClient;
 	#layers: readonly SurfaceLayer[] = [];
@@ -186,20 +103,8 @@ export class CanvasTileRenderer {
 	#uploadBudgetMs = DEFAULT_UPLOAD_BUDGET_MS;
 	#debug = false;
 
-	// Staged changes coalesced into a single per-frame `sync` message to the engine.
-	#dirtyConfig: TileEngineConfig | undefined;
-	#dirtySource:
-		| {
-				readonly dzi: DziDescriptor | null;
-				readonly imageBounds: Rect | null;
-				readonly sourceId: string;
-		  }
-		| undefined;
-	#dirtyImageBounds: Rect | null = null;
-	#hasDirtyImageBounds = false;
-	#dirtyContainer = false;
-	#dirtyViewport = false;
-	#dirtyClearOpaque = false;
+	/** Staged changes, sent to the engine as one `sync` per frame. */
+	#pendingSync: PendingSync = {};
 
 	#lastReportedOptimalLoaded = false;
 	#lastUploadNowMs = Number.NEGATIVE_INFINITY;
@@ -235,10 +140,8 @@ export class CanvasTileRenderer {
 		if (config.tileFadeDuration !== undefined) {
 			this.#tileFadeDuration = config.tileFadeDuration;
 			if (this.#tileFadeDuration <= 0) {
-				this.#opaqueTileKeys.clear();
-				this.#tileFadeStart.clear();
-				this.#pendingOpaqueForEngine.clear();
-				this.#dirtyClearOpaque = true;
+				this.#fade.clear();
+				this.#pendingSync.clearOpaque = true;
 			}
 		}
 		if (config.uploadBudgetMs !== undefined) {
@@ -249,10 +152,9 @@ export class CanvasTileRenderer {
 		}
 
 		const nextEngineConfig = pickEngineConfig(config);
-
 		if (Object.keys(nextEngineConfig).length > 0) {
 			this.#engineConfig = { ...this.#engineConfig, ...nextEngineConfig };
-			this.#dirtyConfig = { ...this.#dirtyConfig, ...nextEngineConfig };
+			this.#pendingSync.config = { ...this.#pendingSync.config, ...nextEngineConfig };
 		}
 
 		this.#syncBackingSize();
@@ -278,9 +180,10 @@ export class CanvasTileRenderer {
 		this.#engineOptimalLoaded = false;
 		this.#reportOptimalLoaded(false);
 
-		this.#dirtySource = { dzi, imageBounds, sourceId };
-		this.#hasDirtyImageBounds = false;
-		this.#dirtyClearOpaque = false;
+		// A new source resets the engine, so older bounds or opaque changes no longer apply.
+		delete this.#pendingSync.imageBounds;
+		delete this.#pendingSync.clearOpaque;
+		this.#pendingSync.source = { dzi, imageBounds, sourceId };
 
 		if (!dzi) {
 			this.#needsPaint = false;
@@ -297,11 +200,11 @@ export class CanvasTileRenderer {
 			return;
 		}
 		this.#imageBounds = imageBounds;
-		if (this.#dirtySource) {
-			this.#dirtySource = { ...this.#dirtySource, imageBounds };
+		const pendingSource = this.#pendingSync.source;
+		if (pendingSource) {
+			this.#pendingSync.source = { ...pendingSource, imageBounds };
 		} else {
-			this.#dirtyImageBounds = imageBounds;
-			this.#hasDirtyImageBounds = true;
+			this.#pendingSync.imageBounds = imageBounds;
 		}
 		this.#needsPaint = true;
 		this.#scheduleSyncAndFrame();
@@ -315,7 +218,7 @@ export class CanvasTileRenderer {
 			return;
 		}
 		this.#viewport = viewport;
-		this.#dirtyViewport = true;
+		this.#pendingSync.viewport = viewport;
 		this.#scheduleSyncAndFrame();
 	}
 
@@ -332,7 +235,7 @@ export class CanvasTileRenderer {
 		}
 		this.#containerSize = size;
 		this.#deviceDpr = deviceDpr;
-		this.#dirtyContainer = true;
+		this.#pendingSync.container = { size, deviceDpr };
 		this.#needsPaint = true;
 		this.#syncBackingSize();
 		this.#scheduleSyncAndFrame();
@@ -501,40 +404,15 @@ export class CanvasTileRenderer {
 	}
 
 	#flushSyncToEngine(): void {
-		const hasOpaque = this.#pendingOpaqueForEngine.size > 0;
-		if (
-			!this.#dirtyConfig &&
-			!this.#dirtySource &&
-			!this.#hasDirtyImageBounds &&
-			!this.#dirtyContainer &&
-			!this.#dirtyViewport &&
-			!this.#dirtyClearOpaque &&
-			!hasOpaque
-		) {
-			return;
-		}
-
+		const opaqueKeys = this.#fade.takeNewlyOpaque();
 		const frame: EngineFrameSync = {
-			...(this.#dirtyConfig ? { config: this.#dirtyConfig } : {}),
-			...(this.#dirtySource ? { source: this.#dirtySource } : {}),
-			...(this.#hasDirtyImageBounds ? { imageBounds: this.#dirtyImageBounds } : {}),
-			...(this.#dirtyContainer
-				? { container: { size: this.#containerSize, deviceDpr: this.#deviceDpr } }
-				: {}),
-			...(this.#dirtyViewport ? { viewport: this.#viewport } : {}),
-			...(this.#dirtyClearOpaque ? { clearOpaque: true } : {}),
-			...(hasOpaque ? { opaqueKeys: Array.from(this.#pendingOpaqueForEngine) } : {})
+			...this.#pendingSync,
+			...(opaqueKeys.length > 0 ? { opaqueKeys } : {})
 		};
-
-		this.#dirtyConfig = undefined;
-		this.#dirtySource = undefined;
-		this.#hasDirtyImageBounds = false;
-		this.#dirtyContainer = false;
-		this.#dirtyViewport = false;
-		this.#dirtyClearOpaque = false;
-		this.#pendingOpaqueForEngine.clear();
-
-		this.#engine.sync(frame);
+		this.#pendingSync = {};
+		if (Object.keys(frame).length > 0) {
+			this.#engine.sync(frame);
+		}
 	}
 
 	#applyEngineDelta(delta: TileEngineDelta): void {
@@ -551,9 +429,7 @@ export class CanvasTileRenderer {
 			delta.evictKeys.forEach((key) => {
 				closeBitmap(this.#bitmaps.get(key));
 				this.#bitmaps.delete(key);
-				this.#tileFadeStart.delete(key);
-				this.#opaqueTileKeys.delete(key);
-				this.#pendingOpaqueForEngine.delete(key);
+				this.#fade.forget(key);
 				this.#surface.evictTile(key);
 			});
 		}
@@ -565,7 +441,7 @@ export class CanvasTileRenderer {
 					closeBitmap(previous);
 				}
 				this.#bitmaps.set(key, bitmap);
-				this.#tileFadeStart.delete(key);
+				this.#fade.restartFade(key);
 			});
 		}
 
@@ -611,17 +487,19 @@ export class CanvasTileRenderer {
 			loadImage: this.#loadImage,
 			onDelta: (delta) => this.#applyEngineDelta(delta)
 		});
-		this.#dirtyConfig = { ...this.#engineConfig };
-		this.#dirtyContainer = true;
-		this.#dirtyViewport = true;
+		// The new engine starts empty, so resend everything it needs besides the source.
+		this.#pendingSync = {
+			...this.#pendingSync,
+			config: { ...this.#engineConfig },
+			container: { size: this.#containerSize, deviceDpr: this.#deviceDpr },
+			viewport: this.#viewport
+		};
 	}
 
 	#clearLocalTiles(): void {
 		this.#bitmaps.forEach((bitmap) => closeBitmap(bitmap));
 		this.#bitmaps.clear();
-		this.#tileFadeStart.clear();
-		this.#opaqueTileKeys.clear();
-		this.#pendingOpaqueForEngine.clear();
+		this.#fade.clear();
 		this.#layers = [];
 		this.#baseTile = null;
 		this.#optimalUploadOrder = [];
@@ -756,15 +634,6 @@ export class CanvasTileRenderer {
 		return this.#surface.kind === 'webgl' ? this.#surface.hasTile(key) : this.#bitmaps.has(key);
 	}
 
-	#markTileOpaque(key: string): boolean {
-		if (this.#opaqueTileKeys.has(key)) {
-			return false;
-		}
-		this.#opaqueTileKeys.add(key);
-		this.#pendingOpaqueForEngine.add(key);
-		return true;
-	}
-
 	#drawLayers(dzi: DziDescriptor, imageBounds: Rect, now: number, useFades: boolean): boolean {
 		if (this.#backingWidth <= 0 || this.#backingHeight <= 0) {
 			return false;
@@ -822,19 +691,14 @@ export class CanvasTileRenderer {
 					// Fallback placeholders (and all tiles when fading is disabled) draw at full opacity
 					// immediately. When a newly opaque optimal tile finishes covering fallbacks, notify
 					// the engine on the next frame so the covered fallback layer is dropped.
-					const becameOpaque = this.#markTileOpaque(tile.key);
+					const becameOpaque = this.#fade.markOpaque(tile.key);
 					if (becameOpaque && layer.isOptimal && this.#layers.length > 1) {
 						needsAnotherFrame = true;
 					}
-				} else if (!this.#opaqueTileKeys.has(tile.key)) {
-					let startedAt = this.#tileFadeStart.get(tile.key);
-					if (startedAt === undefined) {
-						startedAt = now;
-						this.#tileFadeStart.set(tile.key, startedAt);
-					}
-					alpha = Math.min(1, Math.max(0, (now - startedAt) / this.#tileFadeDuration));
+				} else if (!this.#fade.isOpaque(tile.key)) {
+					alpha = this.#fade.alphaAt(tile.key, now, this.#tileFadeDuration);
 					if (alpha >= 1) {
-						this.#markTileOpaque(tile.key);
+						this.#fade.markOpaque(tile.key);
 					}
 					// Keep animating the fade, or run one more frame so the engine drops fallbacks it now covers.
 					needsAnotherFrame = true;

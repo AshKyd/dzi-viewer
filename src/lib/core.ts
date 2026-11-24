@@ -91,18 +91,17 @@ export { TileCache } from './tileCache.js';
 export { DEFAULT_MAX_CONCURRENT_LOADS, TileLoader } from './tileLoader.js';
 export type { TileLoaderConfig, TileLoaderOptions } from './tileLoader.js';
 export { computeRenderPlan, subtractRect, subtractRects } from './retention.js';
+export { CanvasTileRenderer, DEFAULT_UPLOAD_BUDGET_MS } from './canvasRenderer.js';
 export {
-	CanvasTileRenderer,
 	computeBackingSize,
 	computeTileDrawRect,
-	DEFAULT_UPLOAD_BUDGET_MS,
 	SAFARI_MAX_CANVAS_PIXELS
-} from './canvasRenderer.js';
+} from './canvasGeometry.js';
+export type { BackingCanvasSize } from './canvasGeometry.js';
 export type { RenderSurface } from './renderSurface.js';
 export type {
 	AnyCanvas,
 	AnyCanvas2DContext,
-	BackingCanvasSize,
 	CanvasRendererCallbacks,
 	CanvasRendererConfig,
 	CanvasRendererOptions
