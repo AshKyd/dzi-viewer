@@ -1,15 +1,15 @@
 import { CANCELLED_PRECACHE_RESULT, EMPTY_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
 import { createTileEngineWorker } from './tileEngineWorkerFactory.js';
-import type {
-	EngineFrameSync,
-	EngineInboundMessage,
-	EngineOutboundMessage,
-	SerializableDziDescriptor,
-	SerializablePrecacheBoundsOptions,
-	SerializablePrecacheOptions,
-	TileEngineConfig,
-	TileEngineDelta
+import {
+	pickEngineConfig,
+	type EngineFrameSync,
+	type EngineInboundMessage,
+	type EngineOutboundMessage,
+	type SerializableDziDescriptor,
+	type SerializablePrecacheBoundsOptions,
+	type SerializablePrecacheOptions,
+	type TileEngineDelta
 } from './tileEngineProtocol.js';
 import type { TileImageLoader } from './tileLoader.js';
 import type {
@@ -82,23 +82,6 @@ function clonePadding(padding: Padding | undefined): Padding | undefined {
 	};
 }
 
-function cloneConfig(config: TileEngineConfig): TileEngineConfig {
-	return {
-		...(config.maxDpr !== undefined ? { maxDpr: config.maxDpr } : {}),
-		...(config.quality !== undefined ? { quality: config.quality } : {}),
-		...(config.maxConcurrentLoads !== undefined
-			? { maxConcurrentLoads: config.maxConcurrentLoads }
-			: {}),
-		...(config.maxCachedTiles !== undefined ? { maxCachedTiles: config.maxCachedTiles } : {}),
-		...(config.maxRetries !== undefined ? { maxRetries: config.maxRetries } : {}),
-		...(config.failedTileRetryDelay !== undefined
-			? { failedTileRetryDelay: config.failedTileRetryDelay }
-			: {}),
-		...(config.preloadBaseLevel !== undefined ? { preloadBaseLevel: config.preloadBaseLevel } : {}),
-		...('crossOrigin' in config ? { crossOrigin: config.crossOrigin } : {})
-	};
-}
-
 function serializeDzi(dzi: DziDescriptor | null): SerializableDziDescriptor | null {
 	if (!dzi) {
 		return null;
@@ -159,7 +142,7 @@ function cloneFrameSync(
 	dziOverride?: DziDescriptor | null
 ): EngineFrameSync {
 	return {
-		...(frame.config ? { config: cloneConfig(frame.config) } : {}),
+		...(frame.config ? { config: pickEngineConfig(frame.config) } : {}),
 		...(frame.source
 			? {
 					source: {

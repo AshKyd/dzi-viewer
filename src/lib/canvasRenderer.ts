@@ -1,12 +1,13 @@
 import { EMPTY_PRECACHE_RESULT } from './precache.js';
 import { createRenderSurface, type AnyCanvas, type RenderSurface } from './renderSurface.js';
 import { createTileEngineClient, type TileEngineClient } from './tileEngineClient.js';
-import type {
-	BaseTileSnapshot,
-	EngineFrameSync,
-	SurfaceLayer,
-	TileEngineConfig,
-	TileEngineDelta
+import {
+	pickEngineConfig,
+	type BaseTileSnapshot,
+	type EngineFrameSync,
+	type SurfaceLayer,
+	type TileEngineConfig,
+	type TileEngineDelta
 } from './tileEngineProtocol.js';
 import type { TileImageLoader } from './tileLoader.js';
 import { clampDpr, DEFAULT_MAX_DPR } from './tiling.js';
@@ -247,22 +248,7 @@ export class CanvasTileRenderer {
 			this.#debug = config.debug;
 		}
 
-		const nextEngineConfig: TileEngineConfig = {
-			...(config.maxDpr !== undefined ? { maxDpr: config.maxDpr } : {}),
-			...(config.quality !== undefined ? { quality: config.quality } : {}),
-			...(config.maxConcurrentLoads !== undefined
-				? { maxConcurrentLoads: config.maxConcurrentLoads }
-				: {}),
-			...(config.maxCachedTiles !== undefined ? { maxCachedTiles: config.maxCachedTiles } : {}),
-			...(config.maxRetries !== undefined ? { maxRetries: config.maxRetries } : {}),
-			...(config.failedTileRetryDelay !== undefined
-				? { failedTileRetryDelay: config.failedTileRetryDelay }
-				: {}),
-			...(config.preloadBaseLevel !== undefined
-				? { preloadBaseLevel: config.preloadBaseLevel }
-				: {}),
-			...('crossOrigin' in config ? { crossOrigin: config.crossOrigin } : {})
-		};
+		const nextEngineConfig = pickEngineConfig(config);
 
 		if (Object.keys(nextEngineConfig).length > 0) {
 			this.#engineConfig = { ...this.#engineConfig, ...nextEngineConfig };

@@ -22,6 +22,30 @@ export interface TileEngineConfig {
 	readonly crossOrigin?: CrossOrigin;
 }
 
+/** Every `TileEngineConfig` field, so configs can be picked out of wider option objects. */
+export const ENGINE_CONFIG_KEYS = [
+	'maxDpr',
+	'quality',
+	'maxConcurrentLoads',
+	'maxCachedTiles',
+	'maxRetries',
+	'failedTileRetryDelay',
+	'preloadBaseLevel',
+	'crossOrigin'
+] as const satisfies readonly (keyof TileEngineConfig)[];
+
+/**
+ * Copies only the engine fields that are set, as a plain object safe to `postMessage`.
+ * `crossOrigin: undefined` is kept when the key is present, because it means "no CORS credentials".
+ */
+export function pickEngineConfig(config: TileEngineConfig): TileEngineConfig {
+	return Object.fromEntries(
+		ENGINE_CONFIG_KEYS.filter(
+			(key) => key in config && (config[key] !== undefined || key === 'crossOrigin')
+		).map((key) => [key, config[key]])
+	);
+}
+
 /** Compact tile geometry needed by the main-thread WebGL painter (no URLs, stageRects, or LRU metadata). */
 export interface SurfaceTile {
 	readonly key: string;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { devicePixelRatio } from 'svelte/reactivity/window';
-	import { CanvasTileRenderer } from '../../canvasRenderer.js';
+	import { CanvasTileRenderer, type CanvasRendererConfig } from '../../canvasRenderer.js';
 	import { loadDzi } from '../../dzi.js';
 	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import { EMPTY_PRECACHE_RESULT } from '../../precache.js';
@@ -145,6 +145,19 @@
 
 	const hasContainerSize = $derived(containerSize.width > 0 && containerSize.height > 0);
 
+	const rendererConfig: CanvasRendererConfig = $derived({
+		maxDpr,
+		quality,
+		maxConcurrentLoads,
+		maxCachedTiles,
+		maxRetries,
+		failedTileRetryDelay,
+		preloadBaseLevel,
+		tileFadeDuration,
+		crossOrigin,
+		debug
+	});
+
 	// --- Effects ---
 
 	// Create and dispose the WebGL2 / 2D canvas renderer when the `<canvas>` mounts.
@@ -166,18 +179,7 @@
 					untrack(() => onTileError)?.(event);
 				}
 			},
-			untrack(() => ({
-				maxDpr,
-				quality,
-				maxConcurrentLoads,
-				maxCachedTiles,
-				maxRetries,
-				failedTileRetryDelay,
-				preloadBaseLevel,
-				tileFadeDuration,
-				crossOrigin,
-				debug
-			}))
+			untrack(() => rendererConfig)
 		);
 
 		pauseReasons.forEach((reason) => instance.pauseLoading(reason));
@@ -205,18 +207,7 @@
 		if (!currentRenderer) {
 			return;
 		}
-		currentRenderer.configure({
-			maxDpr,
-			quality,
-			maxConcurrentLoads,
-			maxCachedTiles,
-			maxRetries,
-			failedTileRetryDelay,
-			preloadBaseLevel,
-			tileFadeDuration,
-			crossOrigin,
-			debug
-		});
+		currentRenderer.configure(rendererConfig);
 	});
 
 	// Sync container size and device pixel ratio to the renderer.
