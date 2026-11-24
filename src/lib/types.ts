@@ -195,8 +195,6 @@ export interface CachedTile {
 	stageRect: Rect;
 	status: TileStatus;
 	bitmap?: ImageBitmap;
-	/** Timestamp (`performance.now()`) when this tile first entered the canvas draw pass for fade-in timing. */
-	firstDrawnAt?: number;
 	lastUsed: number;
 	error?: unknown;
 	/** `Date.now()` of the most recent failure, used to time retries. */
@@ -228,7 +226,6 @@ export interface PrecacheResult {
 
 export interface RenderLevelLayer {
 	readonly level: number;
-	readonly zIndex: number;
 	readonly isOptimal: boolean;
 	readonly levelSize: Size;
 	readonly tiles: readonly CachedTile[];

@@ -265,7 +265,11 @@ describe('TileCache and TileLoader', () => {
 		// Eviction removes from the index too.
 		Array.from({ length: 20 }, (_, i) => makeSpec(i + 3)).forEach((spec) => cache.setReady(spec));
 		cache.evict(new Set());
-		expect(cache.getReadyTiles().every((tile) => cache.has(tile.key))).toBe(true);
+		expect(
+			[...cache.getReadyTilesByLevel().values()].every((tiles) =>
+				[...tiles].every((tile) => cache.has(tile.key))
+			)
+		).toBe(true);
 		expect(cache.has('src:10:0_0')).toBe(false);
 
 		cache.clear();

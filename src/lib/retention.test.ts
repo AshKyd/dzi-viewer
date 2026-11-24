@@ -85,7 +85,6 @@ describe('coverage subtraction and zero-blank fallback retention', () => {
 		expect(partialPlan.layers.map((l) => l.level)).toEqual([8, 9]);
 		expect(partialPlan.layers[0]?.isOptimal).toBe(false);
 		expect(partialPlan.layers[1]?.isOptimal).toBe(true);
-		expect(partialPlan.layers[1]?.zIndex).toBeGreaterThan(partialPlan.layers[0]?.zIndex ?? 0);
 
 		// Once remaining optimal tiles finish decoding, the fallback level is cleanly removed
 		cache.setReady(zoomedSelection.tiles[2]);

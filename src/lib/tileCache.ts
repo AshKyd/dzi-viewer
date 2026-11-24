@@ -13,7 +13,6 @@ export interface TileCacheOptions {
 function releaseEntryBitmap(entry: CachedTile): void {
 	closeBitmap(entry.bitmap);
 	entry.bitmap = undefined;
-	entry.firstDrawnAt = undefined;
 }
 
 /**
@@ -111,7 +110,6 @@ export class TileCache {
 			this.#onDelete?.(spec.key);
 		}
 		entry.bitmap = bitmap;
-		entry.firstDrawnAt = undefined;
 		entry.error = undefined;
 		entry.failedAt = undefined;
 		this.#onReady?.(entry);
@@ -123,10 +121,6 @@ export class TileCache {
 		entry.error = error;
 		entry.failedAt = Date.now();
 		return entry;
-	}
-
-	getReadyTiles(): CachedTile[] {
-		return Array.from(this.#readyByLevel.values()).flatMap((tiles) => Array.from(tiles));
 	}
 
 	/** Ready tiles grouped by pyramid level. Levels with no ready tiles are left out. */

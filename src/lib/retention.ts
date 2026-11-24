@@ -176,7 +176,6 @@ export function computeRenderPlan({
 	if (uncoveredVisibleRects.length === 0) {
 		const optimalLayer: RenderLevelLayer = {
 			level: optimalLevel,
-			zIndex: 1,
 			isOptimal: true,
 			levelSize: getLevelSize(dzi, optimalLevel),
 			tiles: readyOptimalTiles
@@ -249,9 +248,8 @@ export function computeRenderPlan({
 	// Reverse so farthest fallback sits at the bottom and closest fallback sits directly under the optimal level.
 	const orderedFallbacks: RenderLevelLayer[] = fallbackSelection.selected
 		.reverse()
-		.map((group, index) => ({
+		.map((group) => ({
 			level: group.level,
-			zIndex: index + 1,
 			isOptimal: false,
 			levelSize: getLevelSize(dzi, group.level),
 			tiles: group.tiles
@@ -263,7 +261,6 @@ export function computeRenderPlan({
 					...orderedFallbacks,
 					{
 						level: optimalLevel,
-						zIndex: orderedFallbacks.length + 1,
 						isOptimal: true,
 						levelSize: getLevelSize(dzi, optimalLevel),
 						tiles: readyOptimalTiles
