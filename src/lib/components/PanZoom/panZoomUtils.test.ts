@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { stageToScreen } from '../../viewport.js';
 import {
 	computePinchStep,
+	pinchAroundMidpoint,
 	computeWheelZoomMultiplier,
 	isApplePlatform,
 	panByScreenDelta,
@@ -134,5 +135,36 @@ describe('panZoomUtils', () => {
 
 		expect(zoomIn).toBeCloseTo(1.2);
 		expect(zoomIn * zoomOut).toBeCloseTo(1);
+	});
+});
+
+describe('pinchAroundMidpoint', () => {
+	const containerSize = { width: 800, height: 600 };
+	const viewport = { x: 400, y: 300, zoom: 1 };
+
+	it('keeps the stage point under the fingers while zooming', () => {
+		const midpoint = { x: 200, y: 150 };
+		const next = pinchAroundMidpoint({
+			viewport,
+			containerSize,
+			previousMidpoint: midpoint,
+			nextMidpoint: midpoint,
+			scale: 2,
+			panEnabled: true
+		});
+		expect(next.zoom).toBe(2);
+		expect(stageToScreen({ x: 200, y: 150 }, next, containerSize)).toEqual(midpoint);
+	});
+
+	it('only zooms around the start point when panning is off', () => {
+		const next = pinchAroundMidpoint({
+			viewport,
+			containerSize,
+			previousMidpoint: { x: 400, y: 300 },
+			nextMidpoint: { x: 500, y: 300 },
+			scale: 1,
+			panEnabled: false
+		});
+		expect(next).toEqual(viewport);
 	});
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import { fade } from 'svelte/transition';
 	import type { DziDescriptor, Point, Size, Viewport } from '../../types.js';
 	import { clampViewport } from '../../viewport.js';
@@ -8,13 +9,12 @@
 	import type { DziViewerMethods, ViewerLifecycleListener } from '../DziViewer/dziViewerTypes.js';
 	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
+	import { createGestureController, type GestureController } from './gestureController.js';
 	import {
-		computePinchStep,
-		computeWheelZoomMultiplier,
 		DEFAULT_COOPERATIVE_GESTURE_MESSAGES,
 		isApplePlatform,
 		panByScreenDelta,
-		shouldWheelZoom,
+		pinchAroundMidpoint,
 		zoomAroundPoint
 	} from './panZoomUtils.js';
 
@@ -49,9 +49,7 @@
 	let isDragging = $state(false);
 	let loadDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-	// Pointer positions are bookkeeping only, so they need no reactivity.
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	const activePointers = new Map<number, Point>();
+	let gestures: GestureController | undefined;
 	const lifecycle = createLifecycleEmitter();
 	let lastAppliedViewport: Viewport = { x: Number.NaN, y: Number.NaN, zoom: Number.NaN };
 
@@ -136,11 +134,6 @@
 		return () => el.removeEventListener('touchmove', handleTouchMove);
 	});
 
-	/** In cooperative mode, a lone touch scrolls the page instead of panning. */
-	function isCooperativeSingleTouch(event: PointerEvent): boolean {
-		return cooperativeGestures && event.pointerType === 'touch' && activePointers.size === 1;
-	}
-
 	// External updates to bound x/y/zoom override any active gesture immediately.
 	$effect(() => {
 		const externalChanged =
@@ -152,16 +145,7 @@
 			return;
 		}
 
-		if (rootEl) {
-			Array.from(activePointers.keys()).forEach((pointerId) => {
-				if (rootEl?.hasPointerCapture(pointerId)) {
-					rootEl.releasePointerCapture(pointerId);
-				}
-			});
-		}
-
-		activePointers.clear();
-		isDragging = false;
+		gestures?.cancel();
 		lastAppliedViewport = { x, y, zoom };
 	});
 
@@ -222,124 +206,36 @@
 
 	function getLocalPoint(clientX: number, clientY: number): Point {
 		const rect = rootEl?.getBoundingClientRect();
-		if (!rect) {
-			return { x: clientX, y: clientY };
-		}
-		return {
-			x: clientX - rect.left,
-			y: clientY - rect.top
-		};
+		return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) };
 	}
 
-	// Register a non-passive wheel listener so preventDefault blocks page scroll while zooming.
-	$effect(() => {
-		const el = rootEl;
-		if (!el) {
-			return;
-		}
-
-		const handleWheel = (event: WheelEvent) => {
-			if (!canZoom) {
-				return;
-			}
-			const { ctrlKey, metaKey } = event;
-			if (!shouldWheelZoom({ cooperativeGestures, ctrlKey, metaKey })) {
-				// Leave the event alone so the page scrolls.
-				showHint(isApplePlatform(navigator.platform) ? hintMessages.wheelMac : hintMessages.wheel);
-				return;
-			}
-			event.preventDefault();
-
-			const multiplier = computeWheelZoomMultiplier({
-				deltaY: event.deltaY,
-				deltaMode: event.deltaMode,
-				ctrlKey: event.ctrlKey,
-				wheelZoomFactor
-			});
-			if (multiplier === 1) {
-				return;
-			}
-
-			zoomBy(multiplier, getLocalPoint(event.clientX, event.clientY));
-		};
-
-		el.addEventListener('wheel', handleWheel, { passive: false });
-		return () => el.removeEventListener('wheel', handleWheel);
-	});
-
-	function handlePointerDown(event: PointerEvent): void {
-		if (!interactive) {
-			return;
-		}
-		if (event.pointerType === 'mouse' && event.button !== 0) {
-			return;
-		}
-
-		const point = getLocalPoint(event.clientX, event.clientY);
-		activePointers.set(event.pointerId, point);
-		rootEl?.setPointerCapture(event.pointerId);
-
-		if (canPan && !isCooperativeSingleTouch(event)) {
-			isDragging = true;
-		}
-	}
-
-	function handlePointerMove(event: PointerEvent): void {
-		const previous = activePointers.get(event.pointerId);
-		if (!previous || !interactive) {
-			return;
-		}
-
-		const nextPoint = getLocalPoint(event.clientX, event.clientY);
-
-		if (activePointers.size === 1) {
-			activePointers.set(event.pointerId, nextPoint);
-			if (!canPan || isCooperativeSingleTouch(event)) {
-				return;
-			}
-
-			panBy(nextPoint.x - previous.x, nextPoint.y - previous.y);
-			return;
-		}
-
-		const pointerEntries = Array.from(activePointers.entries());
-		const [firstId, firstPrev] = pointerEntries[0];
-		const [secondId, secondPrev] = pointerEntries[1];
-		activePointers.set(event.pointerId, nextPoint);
-
-		if (event.pointerId !== firstId && event.pointerId !== secondId) {
-			return;
-		}
-
-		const firstNext = activePointers.get(firstId) ?? firstPrev;
-		const secondNext = activePointers.get(secondId) ?? secondPrev;
-
-		const next = computePinchStep({
-			viewport: currentViewport(),
-			containerSize,
-			prevA: firstPrev,
-			prevB: secondPrev,
-			nextA: firstNext,
-			nextB: secondNext,
-			zoomEnabled: canZoom,
-			panEnabled: canPan,
-			constraints
+	/** Drag, pinch and wheel input; created once, reading current props on every event. */
+	const attachGestures: Attachment<HTMLDivElement> = (element) => {
+		gestures = createGestureController(element, {
+			getSettings: () => ({ canPan, canZoom, cooperativeGestures, wheelZoomFactor }),
+			onPan: panBy,
+			onZoom: zoomBy,
+			onPinch: (previousMidpoint, nextMidpoint, scale) =>
+				commitInteraction(
+					pinchAroundMidpoint({
+						viewport: currentViewport(),
+						containerSize,
+						previousMidpoint,
+						nextMidpoint,
+						scale,
+						panEnabled: canPan,
+						constraints
+					})
+				),
+			onDraggingChange: (dragging) => (isDragging = dragging),
+			onPassThroughWheel: () =>
+				showHint(isApplePlatform(navigator.platform) ? hintMessages.wheelMac : hintMessages.wheel)
 		});
-		commitInteraction(next);
-	}
-
-	function handlePointerRelease(event: PointerEvent): void {
-		if (!activePointers.has(event.pointerId)) {
-			return;
-		}
-		activePointers.delete(event.pointerId);
-		if (rootEl?.hasPointerCapture(event.pointerId)) {
-			rootEl.releasePointerCapture(event.pointerId);
-		}
-		if (activePointers.size === 0) {
-			isDragging = false;
-		}
-	}
+		return () => {
+			gestures?.destroy();
+			gestures = undefined;
+		};
+	};
 
 	function handleDoubleClick(event: MouseEvent): void {
 		if (!canZoom || doubleClickZoomFactor <= 0 || doubleClickZoomFactor === 1) {
@@ -431,10 +327,7 @@
 	aria-label={viewerProps.alt || 'Interactive deep zoom image viewer'}
 	aria-disabled={disabled ? 'true' : undefined}
 	tabindex={keyboardEnabled && interactive ? 0 : undefined}
-	onpointerdown={handlePointerDown}
-	onpointermove={handlePointerMove}
-	onpointerup={handlePointerRelease}
-	onpointercancel={handlePointerRelease}
+	{@attach attachGestures}
 	ondblclick={handleDoubleClick}
 	onkeydown={handleKeyDown}
 >

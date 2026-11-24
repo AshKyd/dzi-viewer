@@ -95,8 +95,44 @@ export interface PinchStepParams {
 	readonly constraints?: ViewportConstraints;
 }
 
+export interface PinchAroundMidpointParams {
+	readonly viewport: Viewport;
+	readonly containerSize: Size;
+	/** Midpoint between the two fingers on the previous step, in container pixels. */
+	readonly previousMidpoint: Point;
+	readonly nextMidpoint: Point;
+	/** Zoom multiplier for this step (`1` when zooming is off). */
+	readonly scale: number;
+	/** When false the midpoint's stage point stays put instead of following the fingers. */
+	readonly panEnabled: boolean;
+	readonly constraints?: ViewportConstraints;
+}
+
+/** One pinch step: zooms by `scale` while the stage point under the fingers follows their midpoint. */
+export function pinchAroundMidpoint({
+	viewport,
+	containerSize,
+	previousMidpoint,
+	nextMidpoint,
+	scale,
+	panEnabled,
+	constraints
+}: PinchAroundMidpointParams): Viewport {
+	if (viewport.zoom <= 0 || containerSize.width <= 0 || containerSize.height <= 0) {
+		return viewport;
+	}
+	const anchorStage = screenToStage(previousMidpoint, viewport, containerSize);
+	const next = anchorStagePointAtScreen(
+		anchorStage,
+		panEnabled ? nextMidpoint : previousMidpoint,
+		clampZoom(viewport.zoom * scale, constraints, MIN_SAFE_ZOOM),
+		containerSize
+	);
+	return clampViewport(next, constraints, containerSize);
+}
+
 /**
- * Computes a combined two-finger pinch zoom and pan update around the live pinch midpoint.
+ * Computes a combined two-finger pinch zoom and pan update from both fingers' previous and next positions.
  */
 export function computePinchStep({
 	viewport,
@@ -109,25 +145,19 @@ export function computePinchStep({
 	panEnabled,
 	constraints
 }: PinchStepParams): Viewport {
-	if (viewport.zoom <= 0 || containerSize.width <= 0 || containerSize.height <= 0) {
-		return viewport;
-	}
-
-	const prevMid: Point = { x: (prevA.x + prevB.x) / 2, y: (prevA.y + prevB.y) / 2 };
-	const nextMid: Point = { x: (nextA.x + nextB.x) / 2, y: (nextA.y + nextB.y) / 2 };
 	const prevDist = Math.hypot(prevB.x - prevA.x, prevB.y - prevA.y);
 	const nextDist = Math.hypot(nextB.x - nextA.x, nextB.y - nextA.y);
-
+	// Ignore tiny finger separations, where a pixel of jitter would be a huge zoom.
 	const scale = zoomEnabled && prevDist > 1 && nextDist > 1 ? nextDist / prevDist : 1;
-	// The stage point under the previous midpoint follows the fingers (or stays put if panning is off).
-	const anchorStage = screenToStage(prevMid, viewport, containerSize);
-	const next = anchorStagePointAtScreen(
-		anchorStage,
-		panEnabled ? nextMid : prevMid,
-		clampZoom(viewport.zoom * scale, constraints, MIN_SAFE_ZOOM),
-		containerSize
-	);
-	return clampViewport(next, constraints, containerSize);
+	return pinchAroundMidpoint({
+		viewport,
+		containerSize,
+		previousMidpoint: { x: (prevA.x + prevB.x) / 2, y: (prevA.y + prevB.y) / 2 },
+		nextMidpoint: { x: (nextA.x + nextB.x) / 2, y: (nextA.y + nextB.y) / 2 },
+		scale,
+		panEnabled,
+		constraints
+	});
 }
 
 export interface WheelZoomParams {
