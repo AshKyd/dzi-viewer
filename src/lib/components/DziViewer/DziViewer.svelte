@@ -82,11 +82,7 @@
 	let syncedSourceId = '';
 	let syncedDzi: DziDescriptor | null = null;
 
-	/**
-	 * Sends the active DZI descriptor to `targetRenderer` at most once per `(renderer, sourceId, dzi)`.
-	 * Called eagerly when `loadDzi` resolves (before `onLoad` / lifecycle listeners run) so callers
-	 * can invoke `precacheViewport()` or `holdResolution()` synchronously inside `onLoad`.
-	 */
+	/** Sends the DZI to `targetRenderer` at most once per `(renderer, sourceId, dzi)`, as `setSource` clears its tiles. */
 	function syncSourceToRenderer(
 		targetRenderer: CanvasTileRenderer | undefined,
 		nextDzi: DziDescriptor | null,
@@ -110,27 +106,35 @@
 	}
 
 	/**
-	 * Applies `initialView` once per `source` as soon as both `descriptor` and non-zero `size` exist,
+	 * Applies `initialView` once per `source` as soon as the DZI and a non-zero container size exist,
 	 * before tile loads are scheduled for the default `(0, 0, zoom=1)` viewport.
 	 */
-	function applyInitialViewIfReady(descriptor: DziDescriptor, size: Size): void {
-		if (hasAppliedInitialView || size.width <= 0 || size.height <= 0) {
-			return;
-		}
-		const target = untrack(() => initialView);
-		if (!target) {
-			return;
-		}
-		const stage = resolveStageAndImageBounds(
-			descriptor,
-			untrack(() => stageSize),
-			untrack(() => imageBounds)
-		);
-		const resolved = resolveViewportTarget(target, stage.imageBounds, size);
-		x = resolved.x;
-		y = resolved.y;
-		zoom = resolved.zoom;
-		hasAppliedInitialView = true;
+	function applyInitialViewIfReady(): void {
+		untrack(() => {
+			if (hasAppliedInitialView || !hasContainerSize || !resolvedStage || !initialView) {
+				return;
+			}
+			const resolved = resolveViewportTarget(initialView, resolvedStage.imageBounds, containerSize);
+			x = resolved.x;
+			y = resolved.y;
+			zoom = resolved.zoom;
+			hasAppliedInitialView = true;
+		});
+	}
+
+	/**
+	 * Pushes size, source and viewport straight to the renderer instead of waiting for effects,
+	 * so the first tiles requested after a load or resize are for the initial view.
+	 */
+	function pushStateToRenderer(): void {
+		untrack(() => {
+			if (!renderer) {
+				return;
+			}
+			renderer.setContainerSize(containerSize, rawDpr);
+			syncSourceToRenderer(renderer, dzi, resolvedStage?.imageBounds ?? null, sourceId);
+			renderer.setViewport(effectiveViewport);
+		});
 	}
 
 	// --- Derived viewer state ---
@@ -262,11 +266,8 @@
 				if (nextWidth !== containerSize.width || nextHeight !== containerSize.height) {
 					const nextSize = { width: nextWidth, height: nextHeight };
 					containerSize = nextSize;
-					renderer?.setContainerSize(nextSize, rawDpr);
-					if (dzi) {
-						applyInitialViewIfReady(dzi, nextSize);
-						renderer?.setViewport(effectiveViewport);
-					}
+					applyInitialViewIfReady();
+					pushStateToRenderer();
 					lifecycle.emit({ type: 'resize', containerSize: nextSize });
 				}
 			});
@@ -326,20 +327,9 @@
 					return;
 				}
 				dzi = descriptor;
-				const currentSize = untrack(() => containerSize);
-				applyInitialViewIfReady(descriptor, currentSize);
-				const stage = resolveStageAndImageBounds(
-					descriptor,
-					untrack(() => stageSize),
-					untrack(() => imageBounds)
-				);
-				const currentRenderer = untrack(() => renderer);
-				currentRenderer?.setContainerSize(
-					currentSize,
-					untrack(() => rawDpr)
-				);
-				syncSourceToRenderer(currentRenderer, descriptor, stage.imageBounds, nextSourceId);
-				currentRenderer?.setViewport(untrack(() => effectiveViewport));
+				applyInitialViewIfReady();
+				// Before `onLoad`, so callers can precache or hold resolution straight away.
+				pushStateToRenderer();
 				onLoad?.(descriptor);
 				lifecycle.emit({ type: 'load', dzi: descriptor });
 			})
@@ -357,8 +347,8 @@
 
 	// Fallback for non-ResizeObserver size updates (e.g. bound `containerSize` in tests): frame before tiles load.
 	$effect(() => {
-		if (dzi && hasContainerSize && !hasAppliedInitialView) {
-			applyInitialViewIfReady(dzi, containerSize);
+		if (dzi && hasContainerSize) {
+			applyInitialViewIfReady();
 		}
 	});
 
