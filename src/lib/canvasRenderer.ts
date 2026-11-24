@@ -339,13 +339,7 @@ export class CanvasTileRenderer {
 	}
 
 	precacheViewport(targetViewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {
-		if (
-			this.#destroyed ||
-			!this.#dzi ||
-			!this.#imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		if (!this.#readySource()) {
 			return Promise.resolve(EMPTY_PRECACHE_RESULT);
 		}
 		this.#flushSyncToEngine();
@@ -357,13 +351,7 @@ export class CanvasTileRenderer {
 		mode: 'fit' | 'fill',
 		options?: PrecacheOptions & ViewportFitOptions
 	): Promise<PrecacheResult> {
-		if (
-			this.#destroyed ||
-			!this.#dzi ||
-			!this.#imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		if (!this.#readySource()) {
 			return Promise.resolve(EMPTY_PRECACHE_RESULT);
 		}
 		this.#flushSyncToEngine();
@@ -437,6 +425,14 @@ export class CanvasTileRenderer {
 
 	// --- Internals ---
 
+	/** The DZI and image bounds, or `null` until both exist and the container has a size. */
+	#readySource(): { readonly dzi: DziDescriptor; readonly imageBounds: Rect } | null {
+		const dzi = this.#dzi;
+		const imageBounds = this.#imageBounds;
+		const hasSize = this.#containerSize.width > 0 && this.#containerSize.height > 0;
+		return !this.#destroyed && dzi && imageBounds && hasSize ? { dzi, imageBounds } : null;
+	}
+
 	#runFrame(now: number, immediate = false): void {
 		if (this.#destroyed) {
 			return;
@@ -451,9 +447,8 @@ export class CanvasTileRenderer {
 			this.#inRunFrame = false;
 		}
 
-		const dzi = this.#dzi;
-		const imageBounds = this.#imageBounds;
-		if (!dzi || !imageBounds || this.#containerSize.width <= 0 || this.#containerSize.height <= 0) {
+		const ready = this.#readySource();
+		if (!ready) {
 			this.#paintViewport = this.#viewport;
 			this.#queuedViewport = null;
 			this.#needsPaint = false;
@@ -492,7 +487,7 @@ export class CanvasTileRenderer {
 		if (this.#needsPaint) {
 			this.#needsPaint = false;
 			const useFades = this.#tileFadeDuration > 0;
-			needsAnotherFrame = this.#drawLayers(dzi, imageBounds, now, useFades);
+			needsAnotherFrame = this.#drawLayers(ready.dzi, ready.imageBounds, now, useFades);
 			if (needsAnotherFrame) {
 				this.#needsPaint = true;
 			}

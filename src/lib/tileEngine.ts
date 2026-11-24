@@ -207,19 +207,13 @@ export class TileEngine implements TileEngineClient {
 	}
 
 	precacheViewport(targetViewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {
-		if (
-			this.#destroyed ||
-			!this.#dzi ||
-			!this.#imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		const ready = this.#readySource();
+		if (!ready) {
 			return Promise.resolve(EMPTY_PRECACHE_RESULT);
 		}
 
 		return runPrecacheViewport({
-			dzi: this.#dzi,
-			imageBounds: this.#imageBounds,
+			...ready,
 			viewport: targetViewport,
 			containerSize: this.#containerSize,
 			loader: this.#loader,
@@ -236,20 +230,14 @@ export class TileEngine implements TileEngineClient {
 		mode: 'fit' | 'fill',
 		options?: PrecacheOptions & ViewportFitOptions
 	): Promise<PrecacheResult> {
-		if (
-			this.#destroyed ||
-			!this.#dzi ||
-			!this.#imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		const ready = this.#readySource();
+		if (!ready) {
 			return Promise.resolve(EMPTY_PRECACHE_RESULT);
 		}
 
 		return runPrecacheBounds({
-			dzi: this.#dzi,
-			imageBounds: this.#imageBounds,
-			bounds: bounds ?? this.#imageBounds,
+			...ready,
+			bounds: bounds ?? ready.imageBounds,
 			mode,
 			containerSize: this.#containerSize,
 			loader: this.#loader,
@@ -371,19 +359,24 @@ export class TileEngine implements TileEngineClient {
 		return clampDpr(this.#deviceDpr, this.#maxDpr);
 	}
 
+	/** The DZI and image bounds, or `null` until both exist and the container has a size. */
+	#readySource(): { readonly dzi: DziDescriptor; readonly imageBounds: Rect } | null {
+		const dzi = this.#dzi;
+		const imageBounds = this.#imageBounds;
+		const hasSize = this.#containerSize.width > 0 && this.#containerSize.height > 0;
+		return !this.#destroyed && dzi && imageBounds && hasSize ? { dzi, imageBounds } : null;
+	}
+
 	#selectTiles(): ViewportTilesResult | null {
-		if (
-			!this.#dzi ||
-			!this.#imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		const ready = this.#readySource();
+		if (!ready) {
 			return null;
 		}
+		const { dzi, imageBounds } = ready;
 
 		const grid = getViewportTileGrid({
-			dzi: this.#dzi,
-			imageBounds: this.#imageBounds,
+			dzi,
+			imageBounds,
 			viewport: this.#viewport,
 			containerSize: this.#containerSize,
 			dpr: this.#getSelectionDpr(),
@@ -405,8 +398,8 @@ export class TileEngine implements TileEngineClient {
 		}
 
 		const result = buildTilesForGrid({
-			dzi: this.#dzi,
-			imageBounds: this.#imageBounds,
+			dzi,
+			imageBounds,
 			viewport: this.#viewport,
 			grid,
 			sourceId: this.#sourceId

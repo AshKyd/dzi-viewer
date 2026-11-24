@@ -418,10 +418,10 @@
 		targetViewport: Viewport,
 		options?: PrecacheOptions
 	): Promise<PrecacheResult> {
-		if (!renderer || !dzi || !resolvedStage || !hasContainerSize) {
-			return Promise.resolve(EMPTY_PRECACHE_RESULT);
-		}
-		return renderer.precacheViewport(targetViewport, options);
+		// The renderer returns an empty result itself until a DZI and container size exist.
+		return (
+			renderer?.precacheViewport(targetViewport, options) ?? Promise.resolve(EMPTY_PRECACHE_RESULT)
+		);
 	}
 
 	/**
@@ -432,10 +432,10 @@
 		mode: 'fit' | 'fill',
 		options?: PrecacheOptions & ViewportFitOptions
 	): Promise<PrecacheResult> {
-		if (!renderer || !dzi || !resolvedStage || !hasContainerSize) {
-			return Promise.resolve(EMPTY_PRECACHE_RESULT);
-		}
-		return renderer.precacheBounds(bounds, mode, options);
+		// The renderer returns an empty result itself until a DZI and container size exist.
+		return (
+			renderer?.precacheBounds(bounds, mode, options) ?? Promise.resolve(EMPTY_PRECACHE_RESULT)
+		);
 	}
 
 	export function stageToScreen(point: Point): Point {
