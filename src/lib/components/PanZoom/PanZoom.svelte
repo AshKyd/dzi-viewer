@@ -12,7 +12,11 @@
 		Viewport,
 		ViewportFitOptions
 	} from '../../types.js';
-	import { clampViewport } from '../../viewport.js';
+	import {
+		clampViewport,
+		screenToStage as convertScreenToStage,
+		stageToScreen as convertStageToScreen
+	} from '../../viewport.js';
 	import DziViewer from '../DziViewer/DziViewer.svelte';
 	import type {
 		DziViewerMethods,
@@ -462,11 +466,17 @@
 	}
 
 	export function stageToScreen(point: Point): Point {
-		return viewer?.stageToScreen(point) ?? point;
+		return (
+			viewer?.stageToScreen(point) ??
+			untrack(() => convertStageToScreen(point, currentViewport(), containerSize))
+		);
 	}
 
 	export function screenToStage(point: Point): Point {
-		return viewer?.screenToStage(point) ?? point;
+		return (
+			viewer?.screenToStage(point) ??
+			untrack(() => convertScreenToStage(point, currentViewport(), containerSize))
+		);
 	}
 
 	export function pauseLoading(reason?: string): void {
