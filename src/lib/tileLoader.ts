@@ -1,5 +1,6 @@
 import type { TileCache } from './tileCache.js';
 import type { PrecacheResult, TileErrorEvent, TileSpec } from './types.js';
+import { closeBitmap } from './utils.js';
 
 export type TilePriority = 'active' | 'precache';
 
@@ -54,12 +55,6 @@ const MAX_FAILED_TILE_RETRY_DELAY = 60_000;
 
 interface PriorityRequestInit extends RequestInit {
 	priority?: 'high' | 'low';
-}
-
-function closeBitmap(bitmap: ImageBitmap | undefined): void {
-	if (bitmap && typeof bitmap.close === 'function') {
-		bitmap.close();
-	}
 }
 
 async function defaultLoadImage(

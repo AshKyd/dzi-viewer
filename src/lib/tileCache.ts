@@ -1,4 +1,5 @@
 import type { CachedTile, TileSpec } from './types.js';
+import { closeBitmap } from './utils.js';
 
 export interface TileCacheOptions {
 	readonly maxCachedTiles?: number;
@@ -8,10 +9,9 @@ export interface TileCacheOptions {
 	readonly onReady?: (entry: CachedTile) => void;
 }
 
-function closeBitmap(entry: CachedTile): void {
-	if (entry.bitmap && typeof entry.bitmap.close === 'function') {
-		entry.bitmap.close();
-	}
+/** Frees an entry's bitmap and detaches it so nothing draws a closed bitmap. */
+function releaseEntryBitmap(entry: CachedTile): void {
+	closeBitmap(entry.bitmap);
 	entry.bitmap = undefined;
 	entry.firstDrawnAt = undefined;
 }
@@ -62,7 +62,7 @@ export class TileCache {
 	delete(key: string): void {
 		const entry = this.#entries.get(key);
 		if (entry) {
-			closeBitmap(entry);
+			releaseEntryBitmap(entry);
 			this.#removeFromReadyIndex(entry);
 			this.#entries.delete(key);
 			this.#onDelete?.(key);
@@ -107,9 +107,7 @@ export class TileCache {
 	setReady(spec: TileSpec, bitmap?: ImageBitmap): CachedTile {
 		const entry = this.upsertFromSpec(spec, 'ready');
 		if (entry.bitmap && entry.bitmap !== bitmap) {
-			if (typeof entry.bitmap.close === 'function') {
-				entry.bitmap.close();
-			}
+			closeBitmap(entry.bitmap);
 			this.#onDelete?.(spec.key);
 		}
 		entry.bitmap = bitmap;
@@ -160,7 +158,7 @@ export class TileCache {
 
 	clear(): void {
 		const keys = Array.from(this.#entries.keys());
-		this.#entries.forEach((entry) => closeBitmap(entry));
+		this.#entries.forEach((entry) => releaseEntryBitmap(entry));
 		this.#entries.clear();
 		this.#readyByLevel.clear();
 		this.#tick = 0;

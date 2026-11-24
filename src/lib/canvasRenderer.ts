@@ -22,6 +22,7 @@ import type {
 	Viewport,
 	ViewportFitOptions
 } from './types.js';
+import { closeBitmap, nowMs } from './utils.js';
 import { stageToScreen } from './viewport.js';
 
 /** Safari hard-caps individual 2D canvas areas at 16,777,216 pixels (4096 × 4096). */
@@ -56,16 +57,6 @@ export interface BackingCanvasSize {
 	readonly height: number;
 	/** Effective backing-pixel scale relative to CSS pixels (after area clamping). */
 	readonly scale: number;
-}
-
-function nowMs(): number {
-	return typeof performance !== 'undefined' ? performance.now() : Date.now();
-}
-
-function closeBitmap(bitmap: ImageBitmap | undefined): void {
-	if (bitmap && typeof bitmap.close === 'function') {
-		bitmap.close();
-	}
 }
 
 function isSameViewport(a: Viewport, b: Viewport): boolean {

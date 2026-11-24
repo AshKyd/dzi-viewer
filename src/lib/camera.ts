@@ -22,6 +22,7 @@ import type {
 	ViewportTarget,
 	ViewportTrackStop
 } from './types.js';
+import { nowMs } from './utils.js';
 import { viewportsEqual } from './viewport.js';
 
 const DEFAULT_DURATION_MS = 600;
@@ -148,10 +149,6 @@ interface PendingGoTo {
 	readonly target: ViewportTarget;
 	readonly resolve: (result: TransitionResult) => void;
 	readonly cleanupSignal?: () => void;
-}
-
-function nowMs(): number {
-	return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
 function prefersReducedMotion(): boolean {

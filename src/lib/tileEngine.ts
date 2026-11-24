@@ -34,18 +34,13 @@ import type {
 	Viewport,
 	ViewportFitOptions
 } from './types.js';
+import { closeBitmap } from './utils.js';
 
 export interface TileEngineOptions {
 	readonly loadImage?: TileImageLoader;
 	/** Coalescing delay (ms) for async tile completions when no `sync` arrives (`0` disables timer batching). */
 	readonly asyncBatchMs?: number;
 	readonly onDelta: (delta: TileEngineDelta) => void;
-}
-
-function closeBitmap(bitmap: ImageBitmap | undefined): void {
-	if (bitmap && typeof bitmap.close === 'function') {
-		bitmap.close();
-	}
 }
 
 function toSurfaceLayers(plan: RenderPlan): SurfaceLayer[] {
