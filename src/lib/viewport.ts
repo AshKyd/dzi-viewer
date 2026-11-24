@@ -166,6 +166,13 @@ function clampAxisCentre(
 	return Math.min(maxCentre, Math.max(minCentre, centre));
 }
 
+/** Clamps `zoom` between `constraints.minZoom` (never below `floor`) and `constraints.maxZoom`. */
+export function clampZoom(zoom: number, constraints?: ViewportConstraints, floor = 0): number {
+	const minZoom = Math.max(floor, constraints?.minZoom ?? floor);
+	const maxZoom = constraints?.maxZoom ?? Number.POSITIVE_INFINITY;
+	return Math.min(maxZoom, Math.max(minZoom, zoom));
+}
+
 /**
  * Clamps a viewport to optional zoom limits and stage bounds visibility constraints.
  */
@@ -178,9 +185,7 @@ export function clampViewport(
 		return viewport;
 	}
 
-	const minZoom = constraints.minZoom ?? 0;
-	const maxZoom = constraints.maxZoom ?? Number.POSITIVE_INFINITY;
-	const clampedZoom = Math.min(maxZoom, Math.max(minZoom, viewport.zoom));
+	const clampedZoom = clampZoom(viewport.zoom, constraints);
 
 	if (
 		!constraints.bounds ||

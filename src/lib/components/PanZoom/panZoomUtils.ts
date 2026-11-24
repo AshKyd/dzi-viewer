@@ -1,14 +1,23 @@
 import type { Point, Size, Viewport, ViewportConstraints } from '../../types.js';
 import type { CooperativeGestureMessages } from './panZoomTypes.js';
-import { clampViewport, screenToStage } from '../../viewport.js';
+import { clampViewport, clampZoom, screenToStage } from '../../viewport.js';
 
+/** Gestures never reach zero zoom, which would make stage maths divide by zero. */
 const MIN_SAFE_ZOOM = 1e-6;
 const MAX_WHEEL_DELTA_PX = 300;
 
-function clampZoomValue(zoom: number, constraints?: ViewportConstraints): number {
-	const minZoom = Math.max(MIN_SAFE_ZOOM, constraints?.minZoom ?? MIN_SAFE_ZOOM);
-	const maxZoom = constraints?.maxZoom ?? Number.POSITIVE_INFINITY;
-	return Math.min(maxZoom, Math.max(minZoom, zoom));
+/** Viewport at `zoom` that places `stagePoint` under `screenPoint`. */
+function anchorStagePointAtScreen(
+	stagePoint: Point,
+	screenPoint: Point,
+	zoom: number,
+	containerSize: Size
+): Viewport {
+	return {
+		x: stagePoint.x - (screenPoint.x - containerSize.width / 2) / zoom,
+		y: stagePoint.y - (screenPoint.y - containerSize.height / 2) / zoom,
+		zoom
+	};
 }
 
 export interface PanByDeltaParams {
@@ -64,15 +73,13 @@ export function zoomAroundPoint({
 		return viewport;
 	}
 
-	const clampedZoom = clampZoomValue(nextZoom, constraints);
 	const focalStage = screenToStage(focalScreenPoint, viewport, containerSize);
-
-	const next: Viewport = {
-		x: focalStage.x - (focalScreenPoint.x - containerSize.width / 2) / clampedZoom,
-		y: focalStage.y - (focalScreenPoint.y - containerSize.height / 2) / clampedZoom,
-		zoom: clampedZoom
-	};
-
+	const next = anchorStagePointAtScreen(
+		focalStage,
+		focalScreenPoint,
+		clampZoom(nextZoom, constraints, MIN_SAFE_ZOOM),
+		containerSize
+	);
 	return clampViewport(next, constraints, containerSize);
 }
 
@@ -112,16 +119,14 @@ export function computePinchStep({
 	const nextDist = Math.hypot(nextB.x - nextA.x, nextB.y - nextA.y);
 
 	const scale = zoomEnabled && prevDist > 1 && nextDist > 1 ? nextDist / prevDist : 1;
-	const targetZoom = clampZoomValue(viewport.zoom * scale, constraints);
+	// The stage point under the previous midpoint follows the fingers (or stays put if panning is off).
 	const anchorStage = screenToStage(prevMid, viewport, containerSize);
-	const targetMid = panEnabled ? nextMid : prevMid;
-
-	const next: Viewport = {
-		x: anchorStage.x - (targetMid.x - containerSize.width / 2) / targetZoom,
-		y: anchorStage.y - (targetMid.y - containerSize.height / 2) / targetZoom,
-		zoom: targetZoom
-	};
-
+	const next = anchorStagePointAtScreen(
+		anchorStage,
+		panEnabled ? nextMid : prevMid,
+		clampZoom(viewport.zoom * scale, constraints, MIN_SAFE_ZOOM),
+		containerSize
+	);
 	return clampViewport(next, constraints, containerSize);
 }
 
