@@ -531,7 +531,6 @@ export class CanvasTileRenderer {
 			...(hasOpaque ? { opaqueKeys: Array.from(this.#pendingOpaqueForEngine) } : {})
 		};
 
-		const dziOverride = this.#dirtySource ? this.#dirtySource.dzi : undefined;
 		this.#dirtyConfig = undefined;
 		this.#dirtySource = undefined;
 		this.#hasDirtyImageBounds = false;
@@ -540,7 +539,7 @@ export class CanvasTileRenderer {
 		this.#dirtyClearOpaque = false;
 		this.#pendingOpaqueForEngine.clear();
 
-		this.#engine.sync(frame, dziOverride);
+		this.#engine.sync(frame);
 	}
 
 	#applyEngineDelta(delta: TileEngineDelta): void {

@@ -1,31 +1,25 @@
 import { CANCELLED_PRECACHE_RESULT, EMPTY_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
 import { createTileEngineWorker } from './tileEngineWorkerFactory.js';
-import {
-	pickEngineConfig,
-	type EngineFrameSync,
-	type EngineInboundMessage,
-	type EngineOutboundMessage,
-	type SerializableDziDescriptor,
-	type SerializablePrecacheBoundsOptions,
-	type SerializablePrecacheOptions,
-	type TileEngineDelta
+import type {
+	EngineFrameSync,
+	EngineInboundMessage,
+	EngineOutboundMessage,
+	TileEngineDelta
 } from './tileEngineProtocol.js';
 import type { TileImageLoader } from './tileLoader.js';
 import type {
-	DziDescriptor,
-	Padding,
 	PrecacheOptions,
 	PrecacheResult,
 	Rect,
-	Size,
 	Viewport,
 	ViewportFitOptions
 } from './types.js';
+import { toCloneable } from './utils.js';
 
 export interface TileEngineClient {
 	readonly isWorker: boolean;
-	sync(frame: EngineFrameSync, dziOverride?: DziDescriptor | null): void;
+	sync(frame: EngineFrameSync): void;
 	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult>;
 	precacheBounds(
 		bounds: Rect | undefined,
@@ -58,113 +52,19 @@ function resolveAbsoluteUrl(url: string): string {
 	}
 }
 
-function cloneRect(rect: Rect | null): Rect | null {
-	return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
-}
-
-function cloneSize(size: Size): Size {
-	return { width: size.width, height: size.height };
-}
-
-function cloneViewport(viewport: Viewport): Viewport {
-	return { x: viewport.x, y: viewport.y, zoom: viewport.zoom };
-}
-
-function clonePadding(padding: Padding | undefined): Padding | undefined {
-	if (padding === undefined || typeof padding === 'number') {
-		return padding;
+/** Plain copy of `frame` for `postMessage`, with `getTileUrl` dropped and `tilesUrl` made absolute for the worker. */
+function toWorkerFrame(frame: EngineFrameSync): EngineFrameSync {
+	const dzi = frame.source?.dzi;
+	if (!frame.source || !dzi) {
+		return toCloneable(frame);
 	}
-	return {
-		top: padding.top,
-		right: padding.right,
-		bottom: padding.bottom,
-		left: padding.left
-	};
+	const source = { ...frame.source, dzi: { ...dzi, tilesUrl: resolveAbsoluteUrl(dzi.tilesUrl) } };
+	return toCloneable({ ...frame, source });
 }
 
-function serializeDzi(dzi: DziDescriptor | null): SerializableDziDescriptor | null {
-	if (!dzi) {
-		return null;
-	}
-	return {
-		width: dzi.width,
-		height: dzi.height,
-		tileSize: dzi.tileSize,
-		overlap: dzi.overlap,
-		format: dzi.format,
-		tilesUrl: resolveAbsoluteUrl(dzi.tilesUrl),
-		...(dzi.queryParams !== undefined ? { queryParams: dzi.queryParams } : {}),
-		minLevel: dzi.minLevel,
-		maxLevel: dzi.maxLevel,
-		...(dzi.displayRects
-			? {
-					displayRects: dzi.displayRects.map((rect) => ({
-						x: rect.x,
-						y: rect.y,
-						width: rect.width,
-						height: rect.height,
-						minLevel: rect.minLevel,
-						maxLevel: rect.maxLevel
-					}))
-				}
-			: {})
-	};
-}
-
-function serializePrecacheOptions(
-	options?: PrecacheOptions
-): SerializablePrecacheOptions | undefined {
-	if (!options) {
-		return undefined;
-	}
-	return {
-		...(options.dpr !== undefined ? { dpr: options.dpr } : {}),
-		...(options.maxDpr !== undefined ? { maxDpr: options.maxDpr } : {}),
-		...(options.quality !== undefined ? { quality: options.quality } : {})
-	};
-}
-
-function serializePrecacheBoundsOptions(
-	options?: PrecacheOptions & ViewportFitOptions
-): SerializablePrecacheBoundsOptions | undefined {
-	if (!options) {
-		return undefined;
-	}
-	const padding = clonePadding(options.padding);
-	return {
-		...serializePrecacheOptions(options),
-		...(padding !== undefined ? { padding } : {})
-	};
-}
-
-function cloneFrameSync(
-	frame: EngineFrameSync,
-	dziOverride?: DziDescriptor | null
-): EngineFrameSync {
-	return {
-		...(frame.config ? { config: pickEngineConfig(frame.config) } : {}),
-		...(frame.source
-			? {
-					source: {
-						dzi: serializeDzi(dziOverride !== undefined ? dziOverride : frame.source.dzi),
-						imageBounds: cloneRect(frame.source.imageBounds),
-						sourceId: frame.source.sourceId
-					}
-				}
-			: {}),
-		...(frame.imageBounds !== undefined ? { imageBounds: cloneRect(frame.imageBounds) } : {}),
-		...(frame.container
-			? {
-					container: {
-						size: cloneSize(frame.container.size),
-						deviceDpr: frame.container.deviceDpr
-					}
-				}
-			: {}),
-		...(frame.viewport ? { viewport: cloneViewport(frame.viewport) } : {}),
-		...(frame.opaqueKeys ? { opaqueKeys: [...frame.opaqueKeys] } : {}),
-		...(frame.clearOpaque ? { clearOpaque: true } : {})
-	};
+/** Precache options minus the `AbortSignal`, which can't cross into the worker. */
+function toWorkerOptions<T extends PrecacheOptions>(options?: T): Omit<T, 'signal'> | undefined {
+	return options && toCloneable({ ...options, signal: undefined });
 }
 
 interface PendingPrecache {
@@ -194,13 +94,12 @@ class WorkerTileEngineClient implements TileEngineClient {
 		};
 	}
 
-	sync(frame: EngineFrameSync, dziOverride?: DziDescriptor | null): void {
+	sync(frame: EngineFrameSync): void {
 		if (this.#destroyed) {
 			return;
 		}
 		if (frame.source) {
-			const effectiveDzi = dziOverride !== undefined ? dziOverride : frame.source.dzi;
-			this.#hasDzi = effectiveDzi !== null;
+			this.#hasDzi = frame.source.dzi !== null;
 			this.#hasImageBounds = frame.source.imageBounds !== null;
 			this.#resolutionHeld = false;
 			this.#cancelPendingPrecaches();
@@ -211,7 +110,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#hasContainerSize = frame.container.size.width > 0 && frame.container.size.height > 0;
 		}
 
-		this.#post({ type: 'sync', frame: cloneFrameSync(frame, dziOverride) });
+		this.#post({ type: 'sync', frame: toWorkerFrame(frame) });
 	}
 
 	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {
@@ -222,8 +121,8 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#post({
 				type: 'precacheViewport',
 				id,
-				viewport: cloneViewport(viewport),
-				options: serializePrecacheOptions(options)
+				viewport: toCloneable(viewport),
+				options: toWorkerOptions(options)
 			})
 		);
 	}
@@ -240,9 +139,9 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#post({
 				type: 'precacheBounds',
 				id,
-				bounds: cloneRect(bounds ?? null) ?? undefined,
+				bounds: toCloneable(bounds),
 				mode,
-				options: serializePrecacheBoundsOptions(options)
+				options: toWorkerOptions(options)
 			})
 		);
 	}
@@ -371,8 +270,8 @@ class InProcessTileEngineClient implements TileEngineClient {
 		});
 	}
 
-	sync(frame: EngineFrameSync, dziOverride?: DziDescriptor | null): void {
-		this.#engine.applySync(frame, dziOverride);
+	sync(frame: EngineFrameSync): void {
+		this.#engine.applySync(frame);
 	}
 
 	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {

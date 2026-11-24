@@ -88,21 +88,12 @@ export interface TileEngineDelta {
 	readonly tileErrors?: readonly TileErrorEvent[];
 }
 
-/** `DziDescriptor` without non-cloneable function fields (`getTileUrl`). */
-export type SerializableDziDescriptor = Omit<DziDescriptor, 'getTileUrl'>;
-
-export type SerializablePrecacheOptions = Omit<PrecacheOptions, 'signal'>;
-
-export type SerializablePrecacheBoundsOptions = Omit<
-	PrecacheOptions & ViewportFitOptions,
-	'signal'
->;
-
 /** Batched per-frame state update sent from main thread → Worker in a single `postMessage`. */
 export interface EngineFrameSync {
 	readonly config?: TileEngineConfig;
 	readonly source?: {
-		readonly dzi: SerializableDziDescriptor | null;
+		/** `getTileUrl` is stripped before crossing into a worker (functions can't be cloned). */
+		readonly dzi: DziDescriptor | null;
 		readonly imageBounds: Rect | null;
 		readonly sourceId: string;
 	};
@@ -119,14 +110,14 @@ export type EngineInboundMessage =
 			readonly type: 'precacheViewport';
 			readonly id: number;
 			readonly viewport: Viewport;
-			readonly options?: SerializablePrecacheOptions;
+			readonly options?: Omit<PrecacheOptions, 'signal'>;
 	  }
 	| {
 			readonly type: 'precacheBounds';
 			readonly id: number;
 			readonly bounds?: Rect;
 			readonly mode: 'fit' | 'fill';
-			readonly options?: SerializablePrecacheBoundsOptions;
+			readonly options?: Omit<PrecacheOptions & ViewportFitOptions, 'signal'>;
 	  }
 	| { readonly type: 'abortPrecache'; readonly id: number }
 	| { readonly type: 'pauseLoading'; readonly reason?: string }

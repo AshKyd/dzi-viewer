@@ -163,7 +163,7 @@ export class TileEngine {
 	}
 
 	/** Applies one coalesced frame sync from the main thread and immediately emits any resulting diff. */
-	applySync(frame: EngineFrameSync, dziOverride?: DziDescriptor | null): void {
+	applySync(frame: EngineFrameSync): void {
 		if (this.#destroyed) {
 			return;
 		}
@@ -171,8 +171,7 @@ export class TileEngine {
 			this.#applyConfig(frame.config);
 		}
 		if (frame.source) {
-			const nextDzi = dziOverride !== undefined ? dziOverride : frame.source.dzi;
-			this.#applySource(nextDzi, frame.source.imageBounds, frame.source.sourceId);
+			this.#applySource(frame.source.dzi, frame.source.imageBounds, frame.source.sourceId);
 		} else if (frame.imageBounds !== undefined) {
 			this.#applyImageBounds(frame.imageBounds);
 		}
