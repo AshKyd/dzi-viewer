@@ -71,7 +71,7 @@ workerSelf.onmessage = (event: MessageEvent<EngineInboundMessage>) => {
 			if (message.frame.source) {
 				abortAllPrecaches();
 			}
-			engine.applySync(message.frame);
+			engine.sync(message.frame);
 			return;
 		case 'precacheViewport':
 			runPrecache(message.id, (signal) =>

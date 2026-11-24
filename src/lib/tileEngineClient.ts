@@ -5,6 +5,7 @@ import type {
 	EngineFrameSync,
 	EngineInboundMessage,
 	EngineOutboundMessage,
+	TileEngineClient,
 	TileEngineDelta
 } from './tileEngineProtocol.js';
 import type { TileImageLoader } from './tileLoader.js';
@@ -17,23 +18,7 @@ import type {
 } from './types.js';
 import { toCloneable } from './utils.js';
 
-export interface TileEngineClient {
-	readonly isWorker: boolean;
-	sync(frame: EngineFrameSync): void;
-	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult>;
-	precacheBounds(
-		bounds: Rect | undefined,
-		mode: 'fit' | 'fill',
-		options?: PrecacheOptions & ViewportFitOptions
-	): Promise<PrecacheResult>;
-	pauseLoading(reason?: string): void;
-	resumeLoading(reason?: string): void;
-	isLoadingPaused(): boolean;
-	holdResolution(): void;
-	releaseResolution(): void;
-	isResolutionHeld(): boolean;
-	destroy(): void;
-}
+export type { TileEngineClient } from './tileEngineProtocol.js';
 
 export interface CreateTileEngineClientOptions {
 	readonly hasCustomTileUrl?: boolean;
@@ -257,64 +242,6 @@ class WorkerTileEngineClient implements TileEngineClient {
 	}
 }
 
-class InProcessTileEngineClient implements TileEngineClient {
-	readonly isWorker = false;
-	readonly #engine: TileEngine;
-
-	constructor(onDelta: (delta: TileEngineDelta) => void, loadImage?: TileImageLoader) {
-		this.#engine = new TileEngine({
-			loadImage,
-			// Emit synchronously in-process so unit tests driving `renderNow()` stay deterministic.
-			asyncBatchMs: 0,
-			onDelta
-		});
-	}
-
-	sync(frame: EngineFrameSync): void {
-		this.#engine.applySync(frame);
-	}
-
-	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {
-		return this.#engine.precacheViewport(viewport, options);
-	}
-
-	precacheBounds(
-		bounds: Rect | undefined,
-		mode: 'fit' | 'fill',
-		options?: PrecacheOptions & ViewportFitOptions
-	): Promise<PrecacheResult> {
-		return this.#engine.precacheBounds(bounds, mode, options);
-	}
-
-	pauseLoading(reason?: string): void {
-		this.#engine.pauseLoading(reason);
-	}
-
-	resumeLoading(reason?: string): void {
-		this.#engine.resumeLoading(reason);
-	}
-
-	isLoadingPaused(): boolean {
-		return this.#engine.isLoadingPaused();
-	}
-
-	holdResolution(): void {
-		this.#engine.holdResolution();
-	}
-
-	releaseResolution(): void {
-		this.#engine.releaseResolution();
-	}
-
-	isResolutionHeld(): boolean {
-		return this.#engine.isResolutionHeld();
-	}
-
-	destroy(): void {
-		this.#engine.destroy();
-	}
-}
-
 /**
  * Creates a `TileEngineClient` running all tile calculations, retention, caching, and network
  * decodes inside a Vite-inlined Web Worker, falling back transparently to an in-process
@@ -333,5 +260,6 @@ export function createTileEngineClient({
 			// Fall back to in-process engine when Workers are unavailable or blocked by CSP.
 		}
 	}
-	return new InProcessTileEngineClient(onDelta, loadImage);
+	// Emit synchronously in-process so unit tests driving `renderNow()` stay deterministic.
+	return new TileEngine({ loadImage, asyncBatchMs: 0, onDelta });
 }

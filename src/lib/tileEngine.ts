@@ -20,6 +20,7 @@ import type {
 	BaseTileSnapshot,
 	EngineFrameSync,
 	SurfaceLayer,
+	TileEngineClient,
 	TileEngineConfig,
 	TileEngineDelta
 } from './tileEngineProtocol.js';
@@ -76,7 +77,8 @@ function makeLayersSignature(plan: RenderPlan): string {
  *
  * Emits only coalesced `TileEngineDelta` diffs so `postMessage` traffic stays at most once per frame.
  */
-export class TileEngine {
+export class TileEngine implements TileEngineClient {
+	readonly isWorker = false;
 	readonly #onDelta: (delta: TileEngineDelta) => void;
 	readonly #asyncBatchMs: number;
 	readonly #cache: TileCache;
@@ -163,7 +165,7 @@ export class TileEngine {
 	}
 
 	/** Applies one coalesced frame sync from the main thread and immediately emits any resulting diff. */
-	applySync(frame: EngineFrameSync): void {
+	sync(frame: EngineFrameSync): void {
 		if (this.#destroyed) {
 			return;
 		}

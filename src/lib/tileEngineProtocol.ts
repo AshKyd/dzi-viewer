@@ -129,3 +129,22 @@ export type EngineInboundMessage =
 export type EngineOutboundMessage =
 	| { readonly type: 'delta'; readonly delta: TileEngineDelta }
 	| { readonly type: 'precacheResult'; readonly id: number; readonly result: PrecacheResult };
+
+/** What `CanvasTileRenderer` talks to: a `TileEngine` in-process or a proxy for one in a worker. */
+export interface TileEngineClient {
+	readonly isWorker: boolean;
+	sync(frame: EngineFrameSync): void;
+	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult>;
+	precacheBounds(
+		bounds: Rect | undefined,
+		mode: 'fit' | 'fill',
+		options?: PrecacheOptions & ViewportFitOptions
+	): Promise<PrecacheResult>;
+	pauseLoading(reason?: string): void;
+	resumeLoading(reason?: string): void;
+	isLoadingPaused(): boolean;
+	holdResolution(): void;
+	releaseResolution(): void;
+	isResolutionHeld(): boolean;
+	destroy(): void;
+}
