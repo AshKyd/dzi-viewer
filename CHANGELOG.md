@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1](https://github.com/AshKyd/dzi-viewer/compare/v0.5.0...v0.5.1) (2026-11-24)
+
+### Bug Fixes
+
+* bundle tile worker into dist so consumers' bundlers can load it ([3d75900](https://github.com/AshKyd/dzi-viewer/commit/3d759007e86e9975ccbc2e41b6d1b85d8cd1bfa2))
+
 ## [0.5.0](https://github.com/AshKyd/dzi-viewer/compare/v0.4.0...v0.5.0) (2026-11-24)
 
 ### Features
