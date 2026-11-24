@@ -9,7 +9,7 @@
 		type DziViewerController,
 		type PanZoomController,
 		type ViewerStateSnapshot
-	} from './createViewer.svelte.js';
+	} from './createViewer.js';
 
 	interface Props {
 		/** Which vanilla constructor to mount (`panzoom` or base `viewer`). */
