@@ -1,4 +1,4 @@
-import { getClosestSingleTileLevel, getLevelSize, getTileStageRect } from './dzi.js';
+import { getClosestSingleTileLevel, getLevelSize, getTileStageRect } from './pyramid.js';
 import {
 	EMPTY_PRECACHE_RESULT,
 	precacheBounds as runPrecacheBounds,

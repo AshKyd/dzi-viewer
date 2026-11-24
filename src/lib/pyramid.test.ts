@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseDziJson } from './dziParse.js';
 import {
 	getClosestSingleTileLevel,
 	getLevelGrid,
@@ -6,44 +7,10 @@ import {
 	getMaxLevel,
 	getTilePixelRect,
 	getTileStageRect,
-	getTileUrl,
-	loadDzi,
-	parseDziJson,
-	parseDziXml,
-	resolveTilesUrlFromDziUrl,
 	tileExists
-} from './dzi.js';
+} from './pyramid.js';
 
-const SAMPLE_DZI_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<Image xmlns="http://schemas.microsoft.com/deepzoom/2008" Format="jpg" Overlap="1" TileSize="256">
-  <Size Width="4000" Height="3000"/>
-</Image>`;
-
-describe('DZI parsing and pyramid geometry', () => {
-	it('derives tilesUrl and preserves query parameters from a DZI URL', () => {
-		const resolved = resolveTilesUrlFromDziUrl(
-			'https://www.abc.net.au/dat/news/zoomytellers/venice/kithandkinhero.dzi?v=2'
-		);
-		expect(resolved.tilesUrl).toBe(
-			'https://www.abc.net.au/dat/news/zoomytellers/venice/kithandkinhero_files/'
-		);
-		expect(resolved.queryParams).toBe('?v=2');
-	});
-
-	it('parses DZI XML into a normalised descriptor', () => {
-		const dzi = parseDziXml(SAMPLE_DZI_XML, {
-			sourceUrl: 'https://example.com/images/venice.dzi'
-		});
-		expect(dzi.width).toBe(4000);
-		expect(dzi.height).toBe(3000);
-		expect(dzi.tileSize).toBe(256);
-		expect(dzi.overlap).toBe(1);
-		expect(dzi.format).toBe('jpg');
-		expect(dzi.maxLevel).toBe(12);
-		expect(dzi.tilesUrl).toBe('https://example.com/images/venice_files/');
-		expect(getTileUrl(dzi, 10, 2, 3)).toBe('https://example.com/images/venice_files/10/2_3.jpg');
-	});
-
+describe('DZI pyramid geometry', () => {
 	it('computes Deep Zoom integer-halved level sizes and grids', () => {
 		expect(getMaxLevel(1000, 600)).toBe(10);
 		const dzi = parseDziJson({
@@ -104,16 +71,5 @@ describe('DZI parsing and pyramid geometry', () => {
 		expect(tileExists(dzi, 10, 2, 0)).toBe(false);
 		// Level 9 has no DisplayRects, so all valid tiles exist
 		expect(tileExists(dzi, 9, 1, 1)).toBe(true);
-	});
-
-	it('loads remote XML via custom fetch in loadDzi', async () => {
-		const mockFetch = (() =>
-			Promise.resolve(
-				new Response(SAMPLE_DZI_XML, { status: 200 })
-			)) as unknown as typeof globalThis.fetch;
-
-		const dzi = await loadDzi('https://example.com/test.dzi', { fetch: mockFetch });
-		expect(dzi.width).toBe(4000);
-		expect(dzi.tilesUrl).toBe('https://example.com/test_files/');
 	});
 });

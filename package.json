@@ -95,6 +95,7 @@
 		"@types/node": "^24",
 		"@vitest/browser-playwright": "^5.0.5",
 		"@vitest/coverage-v8": "^5.0.5",
+		"@xmldom/xmldom": "^0.9.12",
 		"eslint": "^10.15.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-storybook": "^10.6.7",

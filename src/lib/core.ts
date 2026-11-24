@@ -20,6 +20,8 @@ export {
 	zoomAroundPoint
 } from './components/PanZoom/panZoomUtils.js';
 
+export { loadDzi, parseDziJson, parseDziXml, resolveTilesUrlFromDziUrl } from './dziParse.js';
+export type { DziParseOptions } from './dziParse.js';
 export {
 	getClosestSingleTileLevel,
 	getLevelGrid,
@@ -30,13 +32,8 @@ export {
 	getTilePixelRect,
 	getTileStageRect,
 	getTileUrl,
-	loadDzi,
-	parseDziJson,
-	parseDziXml,
-	resolveTilesUrlFromDziUrl,
 	tileExists
-} from './dzi.js';
-export type { DziParseOptions } from './dzi.js';
+} from './pyramid.js';
 
 export {
 	clampViewport,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDziJson } from './dzi.js';
+import { parseDziJson } from './dziParse.js';
 import { computeRenderPlan, mergeAdjacentRects, subtractRect } from './retention.js';
 import { TileCache } from './tileCache.js';
 import { getTilesForViewport } from './tiling.js';

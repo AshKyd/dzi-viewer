@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDziJson } from './dzi.js';
+import { parseDziJson } from './dziParse.js';
 import { clampDpr, DEFAULT_MAX_DPR, getOptimalLevel, getTilesForViewport } from './tiling.js';
 
 const SAMPLE_DZI = parseDziJson(

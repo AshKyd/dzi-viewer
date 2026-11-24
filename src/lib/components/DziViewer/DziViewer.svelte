@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import { devicePixelRatio } from 'svelte/reactivity/window';
 	import { CanvasTileRenderer, type CanvasRendererConfig } from '../../canvasRenderer.js';
-	import { loadDzi } from '../../dzi.js';
+	import { loadDzi } from '../../dziParse.js';
 	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import { EMPTY_PRECACHE_RESULT } from '../../precache.js';
 	import { DEFAULT_MAX_CONCURRENT_LOADS } from '../../tileLoader.js';

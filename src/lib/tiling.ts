@@ -6,7 +6,7 @@ import {
 	getTileStageRect,
 	getTileUrl,
 	tileExists
-} from './dzi.js';
+} from './pyramid.js';
 import type { DziDescriptor, Rect, Size, TileSpec, Viewport } from './types.js';
 import { getViewportBounds, rectIntersection } from './viewport.js';
 

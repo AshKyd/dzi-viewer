@@ -1,4 +1,4 @@
-import { getLevelSize } from './dzi.js';
+import { getLevelSize } from './pyramid.js';
 import type { TileCache } from './tileCache.js';
 import type { CachedTile, DziDescriptor, Rect, RenderLevelLayer, TileSpec } from './types.js';
 import { rectIntersection, rectIntersects } from './viewport.js';
