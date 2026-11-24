@@ -194,7 +194,9 @@ export interface CachedTile {
 	readonly pixelRect: Rect;
 	stageRect: Rect;
 	status: TileStatus;
-	image?: HTMLImageElement;
+	bitmap?: ImageBitmap;
+	/** Timestamp (`performance.now()`) when this tile first entered the canvas draw pass for fade-in timing. */
+	firstDrawnAt?: number;
 	lastUsed: number;
 	error?: unknown;
 	/** `Date.now()` of the most recent failure, used to time retries. */
@@ -229,7 +231,5 @@ export interface RenderLevelLayer {
 	readonly zIndex: number;
 	readonly isOptimal: boolean;
 	readonly levelSize: Size;
-	/** Quantised local level-pixel origin subtracted from tile positions to keep GPU layer bounds small. */
-	readonly origin: Point;
 	readonly tiles: readonly CachedTile[];
 }

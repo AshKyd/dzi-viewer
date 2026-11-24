@@ -21,13 +21,14 @@ describe('optimal level selection and tile culling', () => {
 		expect(getOptimalLevel(SAMPLE_DZI, imageBounds, 4, 2)).toBe(12);
 	});
 
-	it('caps DPR at 1.5 by default when computing viewport tiles', () => {
-		expect(DEFAULT_MAX_DPR).toBe(1.5);
-		expect(clampDpr(2)).toBe(1.5);
+	it('caps DPR at 1 by default when computing viewport tiles', () => {
+		expect(DEFAULT_MAX_DPR).toBe(1);
+		expect(clampDpr(2)).toBe(1);
 		expect(clampDpr(1)).toBe(1);
+		expect(clampDpr(2, 1.5)).toBe(1.5);
 
 		// Rendered image width is 640px (4096 * 0.15625).
-		// Uncapped DPR 2 would ask for 1280px (level 11); capped at 1.5 it asks for 960px (level 10).
+		// Uncapped DPR 2 would ask for 1280px (level 11); capped at 1 it asks for 640px (level 10).
 		const result = getTilesForViewport({
 			dzi: SAMPLE_DZI,
 			imageBounds,

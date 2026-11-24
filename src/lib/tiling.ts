@@ -10,7 +10,7 @@ import {
 import type { DziDescriptor, Rect, Size, TileSpec, Viewport } from './types.js';
 import { getViewportBounds, rectIntersection } from './viewport.js';
 
-export const DEFAULT_MAX_DPR = 1.5;
+export const DEFAULT_MAX_DPR = 1;
 
 export function clampDpr(dpr: number, maxDpr = DEFAULT_MAX_DPR): number {
 	return Math.min(maxDpr, Math.max(0.1, dpr));
@@ -18,6 +18,29 @@ export function clampDpr(dpr: number, maxDpr = DEFAULT_MAX_DPR): number {
 
 export function makeTileKey(sourceId: string, level: number, col: number, row: number): string {
 	return `${sourceId}:${level}:${col}_${row}`;
+}
+
+interface LevelEntry {
+	readonly level: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+const levelTableCache = new WeakMap<object, readonly LevelEntry[]>();
+
+function getLevelTable(
+	dzi: Pick<DziDescriptor, 'width' | 'height' | 'minLevel' | 'maxLevel'>
+): readonly LevelEntry[] {
+	const cached = levelTableCache.get(dzi);
+	if (cached) {
+		return cached;
+	}
+	const table = getLevelRange(dzi).map((level) => {
+		const size = getLevelSize(dzi, level);
+		return { level, width: size.width, height: size.height };
+	});
+	levelTableCache.set(dzi, table);
+	return table;
 }
 
 /**
@@ -38,12 +61,11 @@ export function getOptimalLevel(
 	const targetWidth = imageBounds.width * zoom * density;
 	const targetHeight = imageBounds.height * zoom * density;
 
-	const match = getLevelRange(dzi).find((level) => {
-		const size = getLevelSize(dzi, level);
-		return size.width >= targetWidth && size.height >= targetHeight;
-	});
+	const match = getLevelTable(dzi).find(
+		(entry) => entry.width >= targetWidth && entry.height >= targetHeight
+	);
 
-	return match ?? dzi.maxLevel;
+	return match ? match.level : dzi.maxLevel;
 }
 
 export interface ViewportTilesParams {
@@ -69,11 +91,21 @@ export interface ViewportTilesResult {
 	readonly tiles: readonly TileSpec[];
 }
 
+export interface ViewportTileGrid {
+	readonly level: number;
+	readonly visibleBounds: Rect;
+	readonly colMin: number;
+	readonly colMax: number;
+	readonly rowMin: number;
+	readonly rowMax: number;
+	readonly empty: boolean;
+}
+
 /**
- * Computes only the optimal DZI tiles intersecting the current viewport,
- * ordered from the viewport centre outward.
+ * Computes the optimal pyramid level and visible `(colMin..colMax, rowMin..rowMax)` range in O(1)
+ * with minimal allocations so animation loops can skip rebuilding tile specs when the grid is unchanged.
  */
-export function getTilesForViewport({
+export function getViewportTileGrid({
 	dzi,
 	imageBounds,
 	viewport,
@@ -81,10 +113,9 @@ export function getTilesForViewport({
 	dpr = 1,
 	maxDpr = DEFAULT_MAX_DPR,
 	quality = 1,
-	sourceId = 'default',
 	levelOverride,
 	maxLevel = Number.POSITIVE_INFINITY
-}: ViewportTilesParams): ViewportTilesResult {
+}: Omit<ViewportTilesParams, 'sourceId'>): ViewportTileGrid {
 	const visibleBounds = getViewportBounds(viewport, containerSize);
 	const effectiveDpr = clampDpr(dpr, maxDpr) * quality;
 	const requestedLevel =
@@ -93,12 +124,12 @@ export function getTilesForViewport({
 	const level = Math.min(dzi.maxLevel, Math.max(dzi.minLevel, requestedLevel));
 
 	if (imageBounds.width <= 0 || imageBounds.height <= 0) {
-		return { level, visibleBounds, tiles: [] };
+		return { level, visibleBounds, colMin: 0, colMax: -1, rowMin: 0, rowMax: -1, empty: true };
 	}
 
 	const intersection = rectIntersection(visibleBounds, imageBounds);
 	if (!intersection) {
-		return { level, visibleBounds, tiles: [] };
+		return { level, visibleBounds, colMin: 0, colMax: -1, rowMin: 0, rowMax: -1, empty: true };
 	}
 
 	const levelSize = getLevelSize(dzi, level);
@@ -122,25 +153,69 @@ export function getTilesForViewport({
 		Math.floor(Math.max(0, vMax * levelSize.height - EPSILON) / dzi.tileSize)
 	);
 
-	if (colMax < colMin || rowMax < rowMin) {
-		return { level, visibleBounds, tiles: [] };
+	return {
+		level,
+		visibleBounds,
+		colMin,
+		colMax,
+		rowMin,
+		rowMax,
+		empty: colMax < colMin || rowMax < rowMin
+	};
+}
+
+/** Builds ordered `TileSpec`s for a previously computed `ViewportTileGrid`. */
+export function buildTilesForGrid({
+	dzi,
+	imageBounds,
+	viewport,
+	grid,
+	sourceId = 'default'
+}: {
+	readonly dzi: DziDescriptor;
+	readonly imageBounds: Rect;
+	readonly viewport: Viewport;
+	readonly grid: ViewportTileGrid;
+	readonly sourceId?: string;
+}): ViewportTilesResult {
+	if (grid.empty) {
+		return { level: grid.level, visibleBounds: grid.visibleBounds, tiles: [] };
 	}
 
-	const cols = Array.from({ length: colMax - colMin + 1 }, (_, i) => colMin + i);
-	const rows = Array.from({ length: rowMax - rowMin + 1 }, (_, i) => rowMin + i);
+	const specs = getTileSpecCache(dzi, imageBounds);
+	const cols = Array.from({ length: grid.colMax - grid.colMin + 1 }, (_, i) => grid.colMin + i);
+	const rows = Array.from({ length: grid.rowMax - grid.rowMin + 1 }, (_, i) => grid.rowMin + i);
 
 	const tiles = rows
 		.flatMap((row) => cols.map((col) => ({ col, row })))
-		.filter(({ col, row }) => tileExists(dzi, level, col, row))
+		.filter(({ col, row }) => tileExists(dzi, grid.level, col, row))
 		.map(({ col, row }) => {
-			const spec = buildTileSpec(dzi, imageBounds, level, col, row, sourceId);
+			const spec = buildTileSpecInCache(specs, dzi, imageBounds, grid.level, col, row, sourceId);
 			const dx = spec.stageRect.x + spec.stageRect.width / 2 - viewport.x;
 			const dy = spec.stageRect.y + spec.stageRect.height / 2 - viewport.y;
 			return { ...spec, distanceSq: dx * dx + dy * dy };
 		})
 		.sort((a, b) => a.distanceSq - b.distanceSq);
 
-	return { level, visibleBounds, tiles };
+	return { level: grid.level, visibleBounds: grid.visibleBounds, tiles };
+}
+
+/**
+ * Computes only the optimal DZI tiles intersecting the current viewport,
+ * ordered from the viewport centre outward.
+ */
+export function getTilesForViewport({
+	sourceId = 'default',
+	...gridParams
+}: ViewportTilesParams): ViewportTilesResult {
+	const grid = getViewportTileGrid(gridParams);
+	return buildTilesForGrid({
+		dzi: gridParams.dzi,
+		imageBounds: gridParams.imageBounds,
+		viewport: gridParams.viewport,
+		grid,
+		sourceId
+	});
 }
 
 // --- Tile spec cache ---
@@ -172,8 +247,9 @@ function getTileSpecCache(dzi: DziDescriptor, imageBounds: Rect): Map<string, Ti
 	return specs;
 }
 
-/** Returns the `TileSpec` for one tile coordinate, with `distanceSq` of 0. */
-function buildTileSpec(
+/** Returns the `TileSpec` for one tile coordinate, using a pre-resolved per-descriptor spec cache. */
+function buildTileSpecInCache(
+	specs: Map<string, TileSpec>,
 	dzi: DziDescriptor,
 	imageBounds: Rect,
 	level: number,
@@ -181,7 +257,6 @@ function buildTileSpec(
 	row: number,
 	sourceId: string
 ): TileSpec {
-	const specs = getTileSpecCache(dzi, imageBounds);
 	const key = makeTileKey(sourceId, level, col, row);
 	const cached = specs.get(key);
 	if (cached) {
@@ -216,5 +291,13 @@ export function buildSingleTileSpec(
 	if (!tileExists(dzi, level, col, row)) {
 		return null;
 	}
-	return buildTileSpec(dzi, imageBounds, level, col, row, sourceId);
+	return buildTileSpecInCache(
+		getTileSpecCache(dzi, imageBounds),
+		dzi,
+		imageBounds,
+		level,
+		col,
+		row,
+		sourceId
+	);
 }

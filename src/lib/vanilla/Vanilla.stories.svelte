@@ -36,8 +36,9 @@
 			panX: 0.5,
 			panY: 0.5,
 			zoomFactor: 1,
-			maxDpr: 1.5,
+			maxDpr: 1,
 			tileFadeDuration: 200,
+			debug: false,
 			disabled: false,
 			panEnabled: true,
 			zoomEnabled: true

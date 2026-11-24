@@ -64,7 +64,7 @@ export interface DziViewerProps {
 	isOptimalLoaded?: boolean;
 	/** Device pixel ratio override; defaults to `window.devicePixelRatio` capped by `maxDpr`. */
 	dpr?: number;
-	/** Maximum device pixel ratio used for tile level selection (defaults to `1.5`). */
+	/** Maximum device pixel ratio used for tile level selection (defaults to `1`). */
 	maxDpr?: number;
 	/** Multiplier applied to effective DPR when selecting the optimal pyramid level. */
 	quality?: number;
@@ -82,12 +82,9 @@ export interface DziViewerProps {
 	preloadBaseLevel?: boolean;
 	/** Fade-in and crossfade duration for loaded tiles in milliseconds (`0` disables fading). */
 	tileFadeDuration?: number;
-	/**
-	 * Most new tiles added to the DOM per animation frame (defaults to `8`; removals get twice this).
-	 * The rest wait for later frames while coarser tiles keep showing. `Infinity` turns the limit off.
-	 */
-	maxTileMountsPerFrame?: number;
-	/** Optional CORS attribute applied to tile images. */
+	/** Draw a lime-green outline around every rendered tile for debugging tile bounds and levels. */
+	debug?: boolean;
+	/** Optional CORS credentials mode applied to tile fetches (`'use-credentials'` sends credentials). */
 	crossOrigin?: '' | 'anonymous' | 'use-credentials';
 	/** Optional custom tile URL builder overriding the default DZI `{level}/{col}_{row}.{format}` pattern. */
 	getTileUrl?: TileUrlBuilder;

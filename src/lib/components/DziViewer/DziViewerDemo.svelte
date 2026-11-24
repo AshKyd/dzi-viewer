@@ -24,8 +24,8 @@
 		maxDpr?: number;
 		/** Fade-in and crossfade duration for loaded tiles in milliseconds. */
 		tileFadeDuration?: number;
-		/** Most new tiles mounted per animation frame. */
-		maxTileMountsPerFrame?: number;
+		/** Draw lime-green outlines around every rendered tile. */
+		debug?: boolean;
 		/** Pause tile downloads while a tween runs, precaching only the destination. */
 		pauseWhileAnimating?: boolean;
 		/** Hold the current resolution level while a tween runs, so tiles aren't remounted at every level. */
@@ -41,7 +41,7 @@
 		zoomFactor = 1,
 		maxDpr = DEFAULT_MAX_DPR,
 		tileFadeDuration = 200,
-		maxTileMountsPerFrame,
+		debug = false,
 		pauseWhileAnimating = true,
 		holdResolutionWhileAnimating = true
 	}: Props = $props();
@@ -228,7 +228,7 @@
 			{stageSize}
 			{maxDpr}
 			{tileFadeDuration}
-			{maxTileMountsPerFrame}
+			{debug}
 			x={tweenX.current}
 			y={tweenY.current}
 			zoom={tweenZoom.current}

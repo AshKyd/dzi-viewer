@@ -10,8 +10,9 @@ export type TileImageLoader = (
 	options: {
 		readonly priority: TilePriority;
 		readonly crossOrigin?: CrossOrigin;
+		readonly signal?: AbortSignal;
 	}
-) => Promise<HTMLImageElement | undefined>;
+) => Promise<ImageBitmap | undefined>;
 
 export interface TileLoaderOptions {
 	readonly cache: TileCache;
@@ -51,65 +52,53 @@ export const DEFAULT_MAX_CONCURRENT_LOADS = 16;
 const DEFAULT_FAILED_TILE_RETRY_DELAY = 5000;
 const MAX_FAILED_TILE_RETRY_DELAY = 60_000;
 
-function defaultLoadImage(
+interface PriorityRequestInit extends RequestInit {
+	priority?: 'high' | 'low';
+}
+
+function closeBitmap(bitmap: ImageBitmap | undefined): void {
+	if (bitmap && typeof bitmap.close === 'function') {
+		bitmap.close();
+	}
+}
+
+async function defaultLoadImage(
 	url: string,
-	options: { readonly priority: TilePriority; readonly crossOrigin?: CrossOrigin }
-): Promise<HTMLImageElement> {
-	return new Promise((resolve, reject) => {
-		const img = new Image();
-		img.decoding = 'async';
-		img.draggable = false;
-		img.alt = '';
+	options: {
+		readonly priority: TilePriority;
+		readonly crossOrigin?: CrossOrigin;
+		readonly signal?: AbortSignal;
+	}
+): Promise<ImageBitmap> {
+	const init: PriorityRequestInit = {
+		mode: 'cors',
+		credentials: options.crossOrigin === 'use-credentials' ? 'include' : 'same-origin',
+		signal: options.signal,
+		priority: options.priority === 'active' ? 'high' : 'low'
+	};
 
-		if (options.crossOrigin !== undefined) {
-			img.crossOrigin = options.crossOrigin;
-		}
+	const response = await fetch(url, init);
+	if (!response.ok) {
+		throw new Error(`Failed to load tile image (${response.status}): ${url}`);
+	}
 
-		if ('fetchPriority' in img) {
-			img.fetchPriority = options.priority === 'active' ? 'high' : 'low';
-		}
+	const blob = await response.blob();
+	if (options.signal?.aborted) {
+		throw new DOMException('Tile load aborted', 'AbortError');
+	}
 
-		const cleanup = () => {
-			img.removeEventListener('load', handleLoad);
-			img.removeEventListener('error', handleError);
-		};
+	const bitmap = await createImageBitmap(blob);
+	if (options.signal?.aborted) {
+		closeBitmap(bitmap);
+		throw new DOMException('Tile load aborted', 'AbortError');
+	}
 
-		const handleLoad = () => {
-			cleanup();
-			// Wait for bitmap decode before revealing so swapping tiles never causes a blank flash.
-			if (typeof img.decode !== 'function') {
-				resolve(img);
-				return;
-			}
-			img
-				.decode()
-				.then(() => resolve(img))
-				.catch((decodeError: unknown) => {
-					if (img.complete && img.naturalWidth > 0) {
-						resolve(img);
-						return;
-					}
-					reject(decodeError instanceof Error ? decodeError : new Error(String(decodeError)));
-				});
-		};
-
-		const handleError = () => {
-			cleanup();
-			reject(new Error(`Failed to load tile image: ${url}`));
-		};
-
-		img.addEventListener('load', handleLoad);
-		img.addEventListener('error', handleError);
-		img.src = url;
-	});
+	return bitmap;
 }
 
 /**
- * Concurrency-limited tile loader with active-first prioritisation, viewport-change cancellation,
- * decode-before-swap readiness, and retry support.
- *
- * Loads can't be aborted once started, so `reset()` bumps a generation counter instead: any load that
- * started in an earlier generation settles silently without touching the cache or firing callbacks.
+ * Concurrency-limited tile loader with active-first prioritisation, viewport-change queue culling,
+ * `ImageBitmap` decoding (off main thread), AbortSignal cancellation on reset, and retry support.
  */
 export class TileLoader {
 	readonly #cache: TileCache;
@@ -117,6 +106,7 @@ export class TileLoader {
 	readonly #queue = new Map<string, QueuedTask>();
 	/** Key → generation of loads currently running for the current or an earlier generation. */
 	readonly #inFlight = new Map<string, number>();
+	readonly #inFlightControllers = new Map<string, AbortController>();
 	readonly #waiters = new Map<string, Set<(outcome: TileOutcome) => void>>();
 	/** Latest spec for every tile in the active viewport set, used to retry failed tiles. */
 	readonly #activeSpecs = new Map<string, TileSpec>();
@@ -312,7 +302,9 @@ export class TileLoader {
 		this.#failureCounts.clear();
 		Array.from(this.#retryTimers.keys()).forEach((key) => this.#clearRetryTimer(key));
 
-		// Discarded loads will never reach `ready`, so drop their `loading` entries (which are never evicted).
+		// Abort any active fetches and drop `loading` entries (which are never evicted).
+		this.#inFlightControllers.forEach((controller) => controller.abort());
+		this.#inFlightControllers.clear();
 		this.#inFlight.forEach((_, key) => {
 			if (this.#cache.get(key)?.status === 'loading') {
 				this.#cache.delete(key);
@@ -439,14 +431,15 @@ export class TileLoader {
 	#loadWithRetries(
 		spec: TileSpec,
 		priority: TilePriority,
-		remainingRetries: number
-	): Promise<HTMLImageElement | undefined> {
-		return this.#loadImage(spec.url, { priority, crossOrigin: this.#crossOrigin }).catch(
+		remainingRetries: number,
+		signal: AbortSignal
+	): Promise<ImageBitmap | undefined> {
+		return this.#loadImage(spec.url, { priority, crossOrigin: this.#crossOrigin, signal }).catch(
 			(error: unknown) => {
-				if (this.#disposed || remainingRetries <= 0) {
+				if (this.#disposed || signal.aborted || remainingRetries <= 0) {
 					throw error;
 				}
-				return this.#loadWithRetries(spec, priority, remainingRetries - 1);
+				return this.#loadWithRetries(spec, priority, remainingRetries - 1, signal);
 			}
 		);
 	}
@@ -454,20 +447,30 @@ export class TileLoader {
 	#runTask(task: QueuedTask): void {
 		const { spec } = task;
 		const generation = this.#generation;
+		const controller = new AbortController();
 
 		this.#inFlightCount += 1;
 		this.#inFlight.set(spec.key, generation);
+		this.#inFlightControllers.set(spec.key, controller);
 		this.#cache.upsertFromSpec(spec, 'loading');
 
 		// `then(onLoaded, onFailed)` rather than `.then().catch()`, so an error thrown while handling a
 		// successful load can never be mistaken for a failed load.
-		void this.#loadWithRetries(spec, task.active ? 'active' : 'precache', this.#maxRetries)
+		void this.#loadWithRetries(
+			spec,
+			task.active ? 'active' : 'precache',
+			this.#maxRetries,
+			controller.signal
+		)
 			.then(
-				(image) => this.#handleLoaded(spec, generation, image),
+				(bitmap) => this.#handleLoaded(spec, generation, bitmap),
 				(error: unknown) => this.#handleFailed(spec, generation, error)
 			)
 			.finally(() => {
 				this.#inFlightCount -= 1;
+				if (this.#inFlightControllers.get(spec.key) === controller) {
+					this.#inFlightControllers.delete(spec.key);
+				}
 				if (this.#inFlight.get(spec.key) === generation) {
 					this.#inFlight.delete(spec.key);
 				}
@@ -479,13 +482,14 @@ export class TileLoader {
 		return this.#disposed || generation !== this.#generation;
 	}
 
-	#handleLoaded(spec: TileSpec, generation: number, image: HTMLImageElement | undefined): void {
+	#handleLoaded(spec: TileSpec, generation: number, bitmap: ImageBitmap | undefined): void {
 		if (this.#isStale(generation)) {
+			closeBitmap(bitmap);
 			return;
 		}
 		this.#failureCounts.delete(spec.key);
 		this.#clearRetryTimer(spec.key);
-		this.#cache.setReady(spec, image);
+		this.#cache.setReady(spec, bitmap);
 		this.#notifyWaiters(spec.key, 'loaded');
 		this.#invokeCallback(() => this.#onChange?.());
 	}

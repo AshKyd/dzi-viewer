@@ -30,8 +30,8 @@
 		maxDpr?: number;
 		/** Fade-in and crossfade duration in milliseconds. */
 		tileFadeDuration?: number;
-		/** Most new tiles mounted per animation frame. */
-		maxTileMountsPerFrame?: number;
+		/** Draw lime-green outlines around every rendered tile. */
+		debug?: boolean;
 		/** Clamps pan/zoom within the loaded image bounds. */
 		constrainToBounds?: boolean;
 		/** Pause tile downloads while the user drags or zooms, resuming shortly after they stop. */
@@ -55,7 +55,7 @@
 		wheelZoomFactor = 1.2,
 		maxDpr = DEFAULT_MAX_DPR,
 		tileFadeDuration = 200,
-		maxTileMountsPerFrame,
+		debug = false,
 		constrainToBounds = false,
 		pauseWhileInteracting = true,
 		holdResolutionWhileInteracting = true,
@@ -225,7 +225,7 @@
 			{cooperativeGestures}
 			{maxDpr}
 			{tileFadeDuration}
-			{maxTileMountsPerFrame}
+			{debug}
 			{constraints}
 			bind:x
 			bind:y

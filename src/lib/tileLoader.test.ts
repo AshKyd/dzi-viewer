@@ -286,4 +286,59 @@ describe('TileCache and TileLoader', () => {
 		expect(cache.has('src:10:0_0')).toBe(true);
 		expect(cache.has('src:10:1_0')).toBe(false);
 	});
+
+	it('closes ImageBitmaps on delete, overwrite, eviction, clear, and stale loader completion', async () => {
+		const makeBitmap = () => {
+			const close = vi.fn();
+			return { width: 256, height: 256, close } as unknown as ImageBitmap & {
+				close: ReturnType<typeof vi.fn>;
+			};
+		};
+
+		const cache = new TileCache({ maxCachedTiles: 16 });
+		const first = makeBitmap();
+		const replacement = makeBitmap();
+		cache.setReady(makeSpec(0), first);
+		cache.setReady(makeSpec(0), replacement);
+		expect(first.close).toHaveBeenCalledTimes(1);
+		expect(replacement.close).not.toHaveBeenCalled();
+
+		cache.delete('src:10:0_0');
+		expect(replacement.close).toHaveBeenCalledTimes(1);
+
+		const bitmaps = Array.from({ length: 18 }, () => makeBitmap());
+		bitmaps.forEach((bmp, i) => cache.setReady(makeSpec(i), bmp));
+		cache.evict(new Set());
+		expect(bitmaps[0]?.close).toHaveBeenCalledTimes(1);
+		expect(bitmaps[1]?.close).toHaveBeenCalledTimes(1);
+		expect(bitmaps[2]?.close).not.toHaveBeenCalled();
+
+		cache.clear();
+		expect(bitmaps[2]?.close).toHaveBeenCalledTimes(1);
+
+		// Loader aborts in-flight signal on reset() and closes any stale ImageBitmap that still resolves.
+		let resolveLate!: (bitmap: ImageBitmap) => void;
+		let capturedSignal: AbortSignal | undefined;
+		const loader = new TileLoader({
+			cache,
+			maxConcurrent: 1,
+			loadImage: (_url, { signal }) => {
+				capturedSignal = signal;
+				return new Promise((resolve) => {
+					resolveLate = resolve;
+				});
+			}
+		});
+
+		loader.setActiveTiles([makeSpec(0)]);
+		expect(capturedSignal?.aborted).toBe(false);
+		loader.reset();
+		expect(capturedSignal?.aborted).toBe(true);
+
+		const lateBitmap = makeBitmap();
+		resolveLate(lateBitmap);
+		await flushPromises();
+		expect(lateBitmap.close).toHaveBeenCalledTimes(1);
+		expect(cache.has('src:10:0_0')).toBe(false);
+	});
 });

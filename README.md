@@ -82,15 +82,15 @@ All props are optional.
 - `x`, `y`, `zoom`: the viewport. Bindable.
 - `constraints`: `{ minZoom, maxZoom, bounds, minVisibilityRatio }`. Limits how far the user can zoom and pan.
 - `stageSize` / `imageBounds`: place the image inside a larger virtual stage, for example to lay out several images in one coordinate space.
-- `maxDpr` (default `1.5`): caps the device pixel ratio used to pick tile resolution. Lower values load fewer tiles.
+- `maxDpr` (default `1`): caps the device pixel ratio used to pick tile resolution. Lower values load fewer tiles; the canvas backing store still renders up to `2×` DPR on high-density displays.
 - `quality` (default `1`): multiplies the resolution chosen. Use `0.5` for faster, softer images.
 - `tileFadeDuration` (default `200`): tile fade-in in milliseconds. `0` turns fading off.
-- `maxTileMountsPerFrame` (default `8`): most new tiles added to the page per frame. Removals get twice this. When a zoom lands and a whole level swaps in, the rest wait for later frames while coarser tiles keep showing. `Infinity` turns the limit off.
+- `debug` (default `false`): draws a lime-green outline around each rendered tile.
 - `maxConcurrentLoads` (default `16`): tile downloads in flight at once. Suits HTTP/2 and HTTP/3 servers. Over HTTP/1.1 the browser queues anything past about 6 per host, so lower this if the server only speaks HTTP/1.1.
-- `maxCachedTiles` (default `256`): how many decoded tiles to keep in memory.
+- `maxCachedTiles` (default `256`): how many decoded `ImageBitmap` tiles to keep in memory.
 - `maxRetries` (default `1`): immediate retries for a failed tile request.
 - `failedTileRetryDelay` (default `5000`): how long to wait before trying a failed, still-visible tile again. Doubles after each failure, up to 60 seconds.
-- `crossOrigin`: CORS mode for tile images.
+- `crossOrigin`: CORS credentials mode for tile fetches (`'use-credentials'` sends credentials; tiles are fetched with CORS enabled).
 - `onLoad`, `onError`, `onTileError`: callbacks for the descriptor loading, the descriptor failing, and a tile failing.
 
 `PanZoom` also takes `disabled`, `panEnabled`, `zoomEnabled`, `wheelZoomFactor`, `doubleClickZoomFactor`, `keyboardEnabled`, `keyboardPanStep`, `keyboardZoomFactor`, `loadDebounceMs` (default `0`, pauses tile downloads until gestures stop for the given ms), and `onInteract`.
@@ -231,12 +231,11 @@ viewer.resumeLoading();
 
 Run each of these from the project root:
 
-- `npm run dev`: demo site at `src/routes`.
 - `npm run storybook`: component stories.
 - `npm test`: unit tests in Node, then the stories in a headless Chromium browser (needs `npx playwright install chromium`).
 - `npm run check`: type check with `svelte-check`.
 - `npm run lint` / `npm run format`: Prettier and ESLint.
-- `npm run build`: builds the static demo site into `build/`, then the package into `dist/`, including the vanilla bundle. Set `BASE_PATH` (for example `BASE_PATH=/dzi-viewer`) when the site will be hosted under a sub-path.
+- `npm run build`: builds the Svelte library and vanilla bundle into `dist/` and checks them with `publint`.
 
 ## Contributing
 
@@ -246,4 +245,4 @@ This software is provided as-is, with no warranty or liability of any kind. See 
 
 ## Credits
 
-Inspired by [OpenSeadragon](https://openseadragon.github.io/). `dzi-viewer` was built from scratch as a smaller, faster DOM-based alternative for modern browsers, using standard `<img>` elements and GPU-composited CSS transforms instead of `<canvas>` or WebGL.
+Inspired by [OpenSeadragon](https://openseadragon.github.io/). `dzi-viewer` is built from scratch as a small, fast Deep Zoom viewer for modern browsers, running tile selection, fallback retention, LRU caching, and `createImageBitmap` decoding in an inline Web Worker while rendering onto a single `<canvas>` using WebGL2 (`rapid-render`) with automatic 2D canvas fallback.

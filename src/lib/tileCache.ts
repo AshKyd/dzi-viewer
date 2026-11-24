@@ -2,11 +2,24 @@ import type { CachedTile, TileSpec } from './types.js';
 
 export interface TileCacheOptions {
 	readonly maxCachedTiles?: number;
+	/** Called whenever a cached entry is evicted, deleted, overwritten, or cleared. */
+	readonly onDelete?: (key: string) => void;
+	/** Called when a tile transitions to `ready` with its decoded `ImageBitmap`. */
+	readonly onReady?: (entry: CachedTile) => void;
+}
+
+function closeBitmap(entry: CachedTile): void {
+	if (entry.bitmap && typeof entry.bitmap.close === 'function') {
+		entry.bitmap.close();
+	}
+	entry.bitmap = undefined;
+	entry.firstDrawnAt = undefined;
 }
 
 /**
  * LRU cache of decoded tile entries keyed by tile key.
  * Protected keys (currently visible tiles, active fallbacks, or in-flight loads) are never evicted.
+ * Evicted, deleted, and cleared entries explicitly close their `ImageBitmap` to release GPU/RAM immediately.
  */
 export class TileCache {
 	readonly #entries = new Map<string, CachedTile>();
@@ -15,11 +28,15 @@ export class TileCache {
 	 * so it's kept up to date on every status change instead of scanning and grouping the whole cache.
 	 */
 	readonly #readyByLevel = new Map<number, Set<CachedTile>>();
+	readonly #onDelete?: (key: string) => void;
+	readonly #onReady?: (entry: CachedTile) => void;
 	#maxCachedTiles: number;
 	#tick = 0;
 
 	constructor(options?: TileCacheOptions) {
 		this.#maxCachedTiles = Math.max(16, options?.maxCachedTiles ?? 256);
+		this.#onDelete = options?.onDelete;
+		this.#onReady = options?.onReady;
 	}
 
 	get size(): number {
@@ -45,8 +62,10 @@ export class TileCache {
 	delete(key: string): void {
 		const entry = this.#entries.get(key);
 		if (entry) {
+			closeBitmap(entry);
 			this.#removeFromReadyIndex(entry);
 			this.#entries.delete(key);
+			this.#onDelete?.(key);
 		}
 	}
 
@@ -85,11 +104,19 @@ export class TileCache {
 		return created;
 	}
 
-	setReady(spec: TileSpec, image?: HTMLImageElement): CachedTile {
+	setReady(spec: TileSpec, bitmap?: ImageBitmap): CachedTile {
 		const entry = this.upsertFromSpec(spec, 'ready');
-		entry.image = image;
+		if (entry.bitmap && entry.bitmap !== bitmap) {
+			if (typeof entry.bitmap.close === 'function') {
+				entry.bitmap.close();
+			}
+			this.#onDelete?.(spec.key);
+		}
+		entry.bitmap = bitmap;
+		entry.firstDrawnAt = undefined;
 		entry.error = undefined;
 		entry.failedAt = undefined;
+		this.#onReady?.(entry);
 		return entry;
 	}
 
@@ -132,9 +159,12 @@ export class TileCache {
 	}
 
 	clear(): void {
+		const keys = Array.from(this.#entries.keys());
+		this.#entries.forEach((entry) => closeBitmap(entry));
 		this.#entries.clear();
 		this.#readyByLevel.clear();
 		this.#tick = 0;
+		keys.forEach((key) => this.#onDelete?.(key));
 	}
 
 	// --- Ready index ---

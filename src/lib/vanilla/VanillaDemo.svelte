@@ -30,6 +30,8 @@
 		maxDpr?: number;
 		/** Tile fade duration in milliseconds passed through via `controller.update()`. */
 		tileFadeDuration?: number;
+		/** Draw lime-green outlines around every rendered tile. */
+		debug?: boolean;
 		/** Disables PanZoom input when `mode === 'panzoom'`. */
 		disabled?: boolean;
 		/** Enables drag/touch panning when `mode === 'panzoom'`. */
@@ -48,6 +50,7 @@
 		zoomFactor = 1,
 		maxDpr = DEFAULT_MAX_DPR,
 		tileFadeDuration = 200,
+		debug = false,
 		disabled = false,
 		panEnabled = true,
 		zoomEnabled = true
@@ -121,6 +124,7 @@
 			stageSize,
 			maxDpr,
 			tileFadeDuration,
+			debug,
 			alt: 'Vanilla mounted Deep Zoom viewer',
 			onStateChange: (nextState: ViewerStateSnapshot) => {
 				snapshot = nextState;
@@ -159,7 +163,8 @@
 			source,
 			stageSize,
 			maxDpr,
-			tileFadeDuration
+			tileFadeDuration,
+			debug
 		};
 
 		if (mode === 'panzoom') {

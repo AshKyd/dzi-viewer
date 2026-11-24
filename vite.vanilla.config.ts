@@ -20,6 +20,7 @@ export default defineConfig({
 	build: {
 		outDir: path.resolve(import.meta.dirname, 'dist/vanilla'),
 		emptyOutDir: false,
+		minify: true,
 		lib: {
 			entry: path.resolve(import.meta.dirname, 'src/lib/vanilla/index.ts'),
 			formats: ['es'],

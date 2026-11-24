@@ -1,46 +1,9 @@
 import { getLevelSize } from './dzi.js';
 import type { TileCache } from './tileCache.js';
-import type {
-	CachedTile,
-	DziDescriptor,
-	Point,
-	Rect,
-	RenderLevelLayer,
-	TileSpec
-} from './types.js';
+import type { CachedTile, DziDescriptor, Rect, RenderLevelLayer, TileSpec } from './types.js';
 import { rectIntersection, rectIntersects } from './viewport.js';
 
 const COVERAGE_EPSILON = 1e-6;
-
-/** Chunk interval (in level pixels) used to rebase DOM layer origins and keep GPU layer bounds compact. */
-export const LAYER_ORIGIN_CHUNK_SIZE = 2048;
-
-/**
- * Computes a chunk-aligned local origin in level pixels so mounted `.dzi-tile` coordinates
- * remain close to `(0, 0)` even when viewing deep corners of very large DZI pyramids.
- */
-export function computeLayerOrigin(
-	tiles: readonly CachedTile[],
-	chunkSize = LAYER_ORIGIN_CHUNK_SIZE
-): Point {
-	if (tiles.length === 0 || chunkSize <= 0) {
-		return { x: 0, y: 0 };
-	}
-
-	const minX = tiles.reduce(
-		(min, tile) => Math.min(min, tile.pixelRect.x),
-		Number.POSITIVE_INFINITY
-	);
-	const minY = tiles.reduce(
-		(min, tile) => Math.min(min, tile.pixelRect.y),
-		Number.POSITIVE_INFINITY
-	);
-
-	return {
-		x: Math.floor(minX / chunkSize) * chunkSize,
-		y: Math.floor(minY / chunkSize) * chunkSize
-	};
-}
 
 /**
  * Subtracts `cut` from `base`, returning up to 4 non-overlapping remainder rectangles.
@@ -216,7 +179,6 @@ export function computeRenderPlan({
 			zIndex: 1,
 			isOptimal: true,
 			levelSize: getLevelSize(dzi, optimalLevel),
-			origin: computeLayerOrigin(readyOptimalTiles),
 			tiles: readyOptimalTiles
 		};
 		return {
@@ -292,7 +254,6 @@ export function computeRenderPlan({
 			zIndex: index + 1,
 			isOptimal: false,
 			levelSize: getLevelSize(dzi, group.level),
-			origin: computeLayerOrigin(group.tiles),
 			tiles: group.tiles
 		}));
 
@@ -305,7 +266,6 @@ export function computeRenderPlan({
 						zIndex: orderedFallbacks.length + 1,
 						isOptimal: true,
 						levelSize: getLevelSize(dzi, optimalLevel),
-						origin: computeLayerOrigin(readyOptimalTiles),
 						tiles: readyOptimalTiles
 					}
 				]

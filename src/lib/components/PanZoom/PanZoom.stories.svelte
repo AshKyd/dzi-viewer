@@ -26,9 +26,6 @@
 			tileFadeDuration: {
 				control: { type: 'range', min: 0, max: 1500, step: 50 }
 			},
-			maxTileMountsPerFrame: {
-				control: { type: 'range', min: 1, max: 64, step: 1 }
-			},
 			initialMode: {
 				control: { type: 'inline-radio' },
 				options: ['fit', 'fill']
@@ -42,9 +39,9 @@
 			panEnabled: true,
 			zoomEnabled: true,
 			wheelZoomFactor: 1.2,
-			maxDpr: 1.5,
+			maxDpr: 1,
 			tileFadeDuration: 200,
-			maxTileMountsPerFrame: 8,
+			debug: false,
 			constrainToBounds: false,
 			cooperativeGestures: false,
 			pauseWhileInteracting: true,

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDziJson } from './dzi.js';
-import {
-	computeLayerOrigin,
-	computeRenderPlan,
-	LAYER_ORIGIN_CHUNK_SIZE,
-	mergeAdjacentRects,
-	subtractRect
-} from './retention.js';
+import { computeRenderPlan, mergeAdjacentRects, subtractRect } from './retention.js';
 import { TileCache } from './tileCache.js';
 import { getTilesForViewport } from './tiling.js';
 
@@ -257,52 +251,6 @@ describe('coverage subtraction and zero-blank fallback retention', () => {
 
 		expect(fadedPlan.isOptimalLoaded).toBe(true);
 		expect(fadedPlan.layers.map((l) => l.level)).toEqual([9]);
-	});
-
-	it('rebases layer origin in 2048px chunks to keep deep tile coordinates near (0, 0)', () => {
-		const largeDzi = parseDziJson(
-			{
-				Image: { Format: 'jpeg', Overlap: 1, TileSize: 254, Size: { Width: 20000, Height: 10000 } }
-			},
-			{ tilesUrl: 'https://example.com/large_files/' }
-		);
-		const largeBounds = { x: 0, y: 0, width: 20000, height: 10000 };
-		const cache = new TileCache();
-
-		// View the far bottom-right corner at 1:1 native resolution (level 15).
-		const selection = getTilesForViewport({
-			dzi: largeDzi,
-			imageBounds: largeBounds,
-			viewport: { x: 19600, y: 9600, zoom: 1 },
-			containerSize: { width: 500, height: 500 },
-			dpr: 1
-		});
-		selection.tiles.forEach((spec) => cache.setReady(spec));
-
-		const plan = computeRenderPlan({
-			dzi: largeDzi,
-			optimalLevel: selection.level,
-			optimalTiles: selection.tiles,
-			visibleBounds: selection.visibleBounds,
-			cache
-		});
-
-		const layer = plan.layers[0];
-		expect(layer).toBeDefined();
-		expect(layer.origin.x % LAYER_ORIGIN_CHUNK_SIZE).toBe(0);
-		expect(layer.origin.y % LAYER_ORIGIN_CHUNK_SIZE).toBe(0);
-		expect(layer.origin.x).toBeGreaterThanOrEqual(18432);
-		expect(layer.origin.y).toBeGreaterThanOrEqual(8192);
-
-		// Every rebased tile sits well within a compact GPU-friendly bounding box.
-		layer.tiles.forEach((tile) => {
-			expect(tile.pixelRect.x - layer.origin.x).toBeGreaterThanOrEqual(0);
-			expect(tile.pixelRect.x - layer.origin.x).toBeLessThan(LAYER_ORIGIN_CHUNK_SIZE + 512);
-			expect(tile.pixelRect.y - layer.origin.y).toBeGreaterThanOrEqual(0);
-			expect(tile.pixelRect.y - layer.origin.y).toBeLessThan(LAYER_ORIGIN_CHUNK_SIZE + 512);
-		});
-
-		expect(computeLayerOrigin([])).toEqual({ x: 0, y: 0 });
 	});
 
 	it('keeps tiles in grid order while the viewport pans, so DOM nodes never need reordering', () => {

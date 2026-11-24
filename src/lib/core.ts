@@ -78,22 +78,35 @@ export type {
 
 export {
 	buildSingleTileSpec,
+	buildTilesForGrid,
 	clampDpr,
 	DEFAULT_MAX_DPR,
 	getOptimalLevel,
 	getTilesForViewport,
+	getViewportTileGrid,
 	makeTileKey
 } from './tiling.js';
+export type { ViewportTileGrid, ViewportTilesParams, ViewportTilesResult } from './tiling.js';
 export { TileCache } from './tileCache.js';
 export { DEFAULT_MAX_CONCURRENT_LOADS, TileLoader } from './tileLoader.js';
 export type { TileLoaderConfig, TileLoaderOptions } from './tileLoader.js';
+export { computeRenderPlan, subtractRect, subtractRects } from './retention.js';
 export {
-	computeLayerOrigin,
-	computeRenderPlan,
-	LAYER_ORIGIN_CHUNK_SIZE,
-	subtractRect,
-	subtractRects
-} from './retention.js';
+	CanvasTileRenderer,
+	computeBackingSize,
+	computeTileDrawRect,
+	DEFAULT_UPLOAD_BUDGET_MS,
+	SAFARI_MAX_CANVAS_PIXELS
+} from './canvasRenderer.js';
+export type { RenderSurface } from './renderSurface.js';
+export type {
+	AnyCanvas,
+	AnyCanvas2DContext,
+	BackingCanvasSize,
+	CanvasRendererCallbacks,
+	CanvasRendererConfig,
+	CanvasRendererOptions
+} from './canvasRenderer.js';
 export { EMPTY_PRECACHE_RESULT, precacheBounds, precacheViewport } from './precache.js';
 
 export type {

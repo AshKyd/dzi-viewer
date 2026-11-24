@@ -1,7 +1,7 @@
 {
 	"name": "dzi-viewer",
 	"version": "0.4.0",
-	"description": "Lightweight DOM-based Deep Zoom (DZI) image viewer for Svelte 5 and vanilla JavaScript.",
+	"description": "Lightweight WebGL2 / canvas Deep Zoom (DZI) image viewer for Svelte 5 and vanilla JavaScript.",
 	"license": "ISC",
 	"homepage": "https://github.com/AshKyd/dzi-viewer#readme",
 	"repository": {
@@ -57,10 +57,8 @@
 		}
 	},
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build && npm run prepack",
+		"build": "npm run prepack",
 		"build:vanilla": "vite build --config vite.vanilla.config.ts",
-		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && npm run build:vanilla && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -74,7 +72,8 @@
 	},
 	"dependencies": {
 		"d3-ease": "^3.0.1",
-		"d3-interpolate": "^3.0.1"
+		"d3-interpolate": "^3.0.1",
+		"rapid-render": "^1.0.29"
 	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "^5.6.0",
