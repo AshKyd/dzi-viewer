@@ -1,13 +1,9 @@
+import * as Comlink from 'comlink';
 import { CANCELLED_PRECACHE_RESULT, EMPTY_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
 import { createTileEngineWorker } from './tileEngineWorkerFactory.js';
-import type {
-	EngineFrameSync,
-	EngineInboundMessage,
-	EngineOutboundMessage,
-	TileEngineClient,
-	TileEngineDelta
-} from './tileEngineProtocol.js';
+import type { TileEngineWorkerApi } from './tileEngine.worker.js';
+import type { EngineFrameSync, TileEngineClient, TileEngineDelta } from './tileEngineProtocol.js';
 import type { TileImageLoader } from './tileLoader.js';
 import type {
 	PrecacheOptions,
@@ -52,17 +48,17 @@ function toWorkerOptions<T extends PrecacheOptions>(options?: T): Omit<T, 'signa
 	return options && toCloneable({ ...options, signal: undefined });
 }
 
-interface PendingPrecache {
-	readonly resolve: (result: PrecacheResult) => void;
-	readonly cleanupSignal: () => void;
-}
-
+/**
+ * Main-thread proxy for a `TileEngine` running in a worker, called through Comlink.
+ * Keeps a copy of the state that callers read synchronously (pause reasons, held resolution, readiness).
+ */
 class WorkerTileEngineClient implements TileEngineClient {
 	readonly isWorker = true;
 	readonly #worker: Worker;
-	readonly #onDelta: (delta: TileEngineDelta) => void;
+	readonly #remote: Comlink.Remote<TileEngineWorkerApi>;
 	readonly #pauseReasons = new Set<string>();
-	readonly #pendingPrecaches = new Map<number, PendingPrecache>();
+	/** Settles in-flight precaches early as cancelled, e.g. when the source changes. */
+	readonly #cancelPrecache = new Map<number, () => void>();
 
 	#nextPrecacheId = 1;
 	#hasDzi = false;
@@ -73,10 +69,14 @@ class WorkerTileEngineClient implements TileEngineClient {
 
 	constructor(worker: Worker, onDelta: (delta: TileEngineDelta) => void) {
 		this.#worker = worker;
-		this.#onDelta = onDelta;
-		this.#worker.onmessage = (event: MessageEvent<EngineOutboundMessage>) => {
-			this.#handleMessage(event.data);
-		};
+		this.#remote = Comlink.wrap<TileEngineWorkerApi>(worker);
+		void this.#remote.init(
+			Comlink.proxy((delta: TileEngineDelta) => {
+				if (!this.#destroyed) {
+					onDelta(delta);
+				}
+			})
+		);
 	}
 
 	sync(frame: EngineFrameSync): void {
@@ -87,28 +87,19 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#hasDzi = frame.source.dzi !== null;
 			this.#hasImageBounds = frame.source.imageBounds !== null;
 			this.#resolutionHeld = false;
-			this.#cancelPendingPrecaches();
+			this.#cancelAllPrecaches();
 		} else if (frame.imageBounds !== undefined) {
 			this.#hasImageBounds = frame.imageBounds !== null;
 		}
 		if (frame.container) {
 			this.#hasContainerSize = frame.container.size.width > 0 && frame.container.size.height > 0;
 		}
-
-		this.#post({ type: 'sync', frame: toWorkerFrame(frame) });
+		void this.#remote.sync(toWorkerFrame(frame));
 	}
 
 	precacheViewport(viewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult> {
-		if (this.#destroyed || !this.#hasDzi || !this.#hasImageBounds || !this.#hasContainerSize) {
-			return Promise.resolve(EMPTY_PRECACHE_RESULT);
-		}
-		return this.#enqueuePrecache(options?.signal, (id) =>
-			this.#post({
-				type: 'precacheViewport',
-				id,
-				viewport: toCloneable(viewport),
-				options: toWorkerOptions(options)
-			})
+		return this.#precache(options?.signal, (id) =>
+			this.#remote.precacheViewport(id, toCloneable(viewport), toWorkerOptions(options))
 		);
 	}
 
@@ -117,30 +108,20 @@ class WorkerTileEngineClient implements TileEngineClient {
 		mode: 'fit' | 'fill',
 		options?: PrecacheOptions & ViewportFitOptions
 	): Promise<PrecacheResult> {
-		if (this.#destroyed || !this.#hasDzi || !this.#hasImageBounds || !this.#hasContainerSize) {
-			return Promise.resolve(EMPTY_PRECACHE_RESULT);
-		}
-		return this.#enqueuePrecache(options?.signal, (id) =>
-			this.#post({
-				type: 'precacheBounds',
-				id,
-				bounds: toCloneable(bounds),
-				mode,
-				options: toWorkerOptions(options)
-			})
+		return this.#precache(options?.signal, (id) =>
+			this.#remote.precacheBounds(id, toCloneable(bounds), mode, toWorkerOptions(options))
 		);
 	}
 
 	pauseLoading(reason = 'default'): void {
 		this.#pauseReasons.add(reason);
-		this.#post({ type: 'pauseLoading', reason });
+		void this.#remote.pauseLoading(reason);
 	}
 
 	resumeLoading(reason = 'default'): void {
-		if (!this.#pauseReasons.delete(reason)) {
-			return;
+		if (this.#pauseReasons.delete(reason)) {
+			void this.#remote.resumeLoading(reason);
 		}
-		this.#post({ type: 'resumeLoading', reason });
 	}
 
 	isLoadingPaused(): boolean {
@@ -148,11 +129,11 @@ class WorkerTileEngineClient implements TileEngineClient {
 	}
 
 	holdResolution(): void {
-		if (!this.#hasDzi || !this.#hasImageBounds || !this.#hasContainerSize) {
+		if (!this.#isReady()) {
 			return;
 		}
 		this.#resolutionHeld = true;
-		this.#post({ type: 'holdResolution' });
+		void this.#remote.holdResolution();
 	}
 
 	releaseResolution(): void {
@@ -160,7 +141,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 			return;
 		}
 		this.#resolutionHeld = false;
-		this.#post({ type: 'releaseResolution' });
+		void this.#remote.releaseResolution();
 	}
 
 	isResolutionHeld(): boolean {
@@ -172,73 +153,48 @@ class WorkerTileEngineClient implements TileEngineClient {
 			return;
 		}
 		this.#destroyed = true;
-		this.#cancelPendingPrecaches();
-		this.#worker.onmessage = null;
-		this.#worker.postMessage({ type: 'destroy' } satisfies EngineInboundMessage);
+		this.#cancelAllPrecaches();
+		this.#remote[Comlink.releaseProxy]();
 		this.#worker.terminate();
 	}
 
-	#post(message: EngineInboundMessage): void {
-		if (this.#destroyed) {
-			return;
-		}
-		this.#worker.postMessage(message);
+	/** True once the worker has a DZI, image bounds and a non-empty container. */
+	#isReady(): boolean {
+		return !this.#destroyed && this.#hasDzi && this.#hasImageBounds && this.#hasContainerSize;
 	}
 
-	#enqueuePrecache(
+	/** Runs a worker precache that resolves as cancelled if `signal` aborts or the source changes first. */
+	#precache(
 		signal: AbortSignal | undefined,
-		send: (id: number) => void
+		start: (id: number) => Promise<PrecacheResult>
 	): Promise<PrecacheResult> {
+		if (!this.#isReady()) {
+			return Promise.resolve(EMPTY_PRECACHE_RESULT);
+		}
 		if (signal?.aborted) {
 			return Promise.resolve(CANCELLED_PRECACHE_RESULT);
 		}
 
 		const id = this.#nextPrecacheId++;
-		return new Promise((resolve) => {
-			const onAbort = () => {
-				const pending = this.#pendingPrecaches.get(id);
-				if (!pending) {
-					return;
-				}
-				this.#pendingPrecaches.delete(id);
-				pending.cleanupSignal();
-				this.#post({ type: 'abortPrecache', id });
-				resolve(CANCELLED_PRECACHE_RESULT);
-			};
+		const cancelled = Promise.withResolvers<PrecacheResult>();
+		const cancel = () => cancelled.resolve(CANCELLED_PRECACHE_RESULT);
+		const onAbort = () => {
+			void this.#remote.abortPrecache(id);
+			cancel();
+		};
+		this.#cancelPrecache.set(id, cancel);
+		signal?.addEventListener('abort', onAbort, { once: true });
 
-			signal?.addEventListener('abort', onAbort, { once: true });
-			this.#pendingPrecaches.set(id, {
-				resolve,
-				cleanupSignal: () => signal?.removeEventListener('abort', onAbort)
-			});
-			send(id);
+		const finished = start(id).catch(() => CANCELLED_PRECACHE_RESULT);
+		return Promise.race([finished, cancelled.promise]).finally(() => {
+			signal?.removeEventListener('abort', onAbort);
+			this.#cancelPrecache.delete(id);
 		});
 	}
 
-	#cancelPendingPrecaches(): void {
-		const entries = Array.from(this.#pendingPrecaches.values());
-		this.#pendingPrecaches.clear();
-		entries.forEach(({ resolve, cleanupSignal }) => {
-			cleanupSignal();
-			resolve(CANCELLED_PRECACHE_RESULT);
-		});
-	}
-
-	#handleMessage(message: EngineOutboundMessage): void {
-		if (this.#destroyed) {
-			return;
-		}
-		if (message.type === 'delta') {
-			this.#onDelta(message.delta);
-			return;
-		}
-		const pending = this.#pendingPrecaches.get(message.id);
-		if (!pending) {
-			return;
-		}
-		this.#pendingPrecaches.delete(message.id);
-		pending.cleanupSignal();
-		pending.resolve(message.result);
+	#cancelAllPrecaches(): void {
+		this.#cancelPrecache.forEach((cancel) => cancel());
+		this.#cancelPrecache.clear();
 	}
 }
 

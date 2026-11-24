@@ -1,5 +1,6 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect, userEvent, waitFor, within } from 'storybook/test';
 	import {
 		NOOSA_BEACH_DZI,
 		HERENGRACHT_DZI,
@@ -51,6 +52,18 @@
 	args={{
 		source: HERENGRACHT_DZI,
 		initialMode: 'fit'
+	}}
+	play={async ({ canvasElement }) => {
+		// Exercises the tile worker end to end: visible tiles load, then a precache round-trips.
+		const canvas = within(canvasElement);
+		await waitFor(() => expect(canvas.getByText(/Optimal loaded/)).toBeInTheDocument(), {
+			timeout: 15_000
+		});
+		await userEvent.click(canvas.getByRole('button', { name: 'Pre-cache detail' }));
+		await waitFor(
+			() => expect(canvas.getByText(/Pre-cached \d+\/\d+ tiles \(0 failed\)/)).toBeInTheDocument(),
+			{ timeout: 15_000 }
+		);
 	}}
 />
 

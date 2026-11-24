@@ -72,6 +72,7 @@
 		"build-storybook": "storybook build"
 	},
 	"dependencies": {
+		"comlink": "^4.4.2",
 		"d3-ease": "^3.0.1",
 		"d3-interpolate": "^3.0.1",
 		"rapid-render": "^1.0.29"

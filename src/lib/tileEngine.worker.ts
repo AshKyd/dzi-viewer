@@ -1,111 +1,117 @@
+import * as Comlink from 'comlink';
 import { CANCELLED_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
+import type { EngineFrameSync, TileEngineDelta } from './tileEngineProtocol.js';
 import type {
-	EngineInboundMessage,
-	EngineOutboundMessage,
-	TileEngineDelta
-} from './tileEngineProtocol.js';
-import type { PrecacheResult } from './types.js';
+	PrecacheOptions,
+	PrecacheResult,
+	Rect,
+	Viewport,
+	ViewportFitOptions
+} from './types.js';
 
-interface WorkerScope {
-	onmessage: ((event: MessageEvent<EngineInboundMessage>) => void) | null;
-	postMessage(message: EngineOutboundMessage, transfer?: Transferable[]): void;
-}
+type DeltaListener = (delta: TileEngineDelta) => void;
 
-const workerSelf = globalThis as unknown as WorkerScope;
+let engine: TileEngine | undefined;
 const precacheControllers = new Map<number, AbortController>();
 
-function postDelta(delta: TileEngineDelta): void {
-	const transfer: Transferable[] = delta.addedTiles
-		? delta.addedTiles.map((item) => item.bitmap)
-		: [];
+// --- Delta delivery ---
 
-	try {
-		workerSelf.postMessage({ type: 'delta', delta }, transfer);
-	} catch {
-		// Fallback if a `tileErrors` entry contains a non-cloneable error value.
-		const safeDelta: TileEngineDelta = delta.tileErrors
-			? {
-					...delta,
-					tileErrors: delta.tileErrors.map((err) => ({ ...err, error: String(err.error) }))
-				}
-			: delta;
-		workerSelf.postMessage({ type: 'delta', delta: safeDelta }, transfer);
-	}
+/** Error values may not be cloneable (e.g. custom classes), so they fall back to strings. */
+function withStringErrors(delta: TileEngineDelta): TileEngineDelta {
+	return delta.tileErrors
+		? {
+				...delta,
+				tileErrors: delta.tileErrors.map((err) => ({ ...err, error: String(err.error) }))
+			}
+		: delta;
 }
 
-const engine = new TileEngine({
-	asyncBatchMs: 8,
-	onDelta: postDelta
-});
+/** Sends `delta` to the main thread, transferring bitmaps rather than copying them. */
+function postDelta(onDelta: Comlink.Remote<DeltaListener>, delta: TileEngineDelta): void {
+	const bitmaps = delta.addedTiles?.map((item) => item.bitmap) ?? [];
+	// A failed clone transfers nothing, so the retry can still send the same bitmaps.
+	void onDelta(Comlink.transfer(delta, bitmaps)).catch(() =>
+		onDelta(Comlink.transfer(withStringErrors(delta), bitmaps))
+	);
+}
+
+// --- Precaching ---
 
 function abortAllPrecaches(): void {
-	Array.from(precacheControllers.values()).forEach((controller) => controller.abort());
+	precacheControllers.forEach((controller) => controller.abort());
 	precacheControllers.clear();
 }
 
-function runPrecache(id: number, start: (signal: AbortSignal) => Promise<PrecacheResult>): void {
+/** Runs a precache under an id the main thread can abort, since `AbortSignal` can't cross threads. */
+function runPrecache(
+	id: number,
+	start: (signal: AbortSignal) => Promise<PrecacheResult>
+): Promise<PrecacheResult> {
 	const controller = new AbortController();
 	precacheControllers.set(id, controller);
-
-	void start(controller.signal)
-		.then((result) => {
-			precacheControllers.delete(id);
-			workerSelf.postMessage({ type: 'precacheResult', id, result });
-		})
-		.catch(() => {
-			precacheControllers.delete(id);
-			workerSelf.postMessage({
-				type: 'precacheResult',
-				id,
-				result: CANCELLED_PRECACHE_RESULT
-			});
-		});
+	return start(controller.signal)
+		.catch(() => CANCELLED_PRECACHE_RESULT)
+		.finally(() => precacheControllers.delete(id));
 }
 
-workerSelf.onmessage = (event: MessageEvent<EngineInboundMessage>) => {
-	const message = event.data;
+// --- API exposed to `WorkerTileEngineClient` ---
 
-	switch (message.type) {
-		case 'sync':
-			if (message.frame.source) {
-				abortAllPrecaches();
-			}
-			engine.sync(message.frame);
-			return;
-		case 'precacheViewport':
-			runPrecache(message.id, (signal) =>
-				engine.precacheViewport(message.viewport, { ...message.options, signal })
-			);
-			return;
-		case 'precacheBounds':
-			runPrecache(message.id, (signal) =>
-				engine.precacheBounds(message.bounds, message.mode, { ...message.options, signal })
-			);
-			return;
-		case 'abortPrecache': {
-			const controller = precacheControllers.get(message.id);
-			if (controller) {
-				controller.abort();
-				precacheControllers.delete(message.id);
-			}
-			return;
-		}
-		case 'pauseLoading':
-			engine.pauseLoading(message.reason);
-			return;
-		case 'resumeLoading':
-			engine.resumeLoading(message.reason);
-			return;
-		case 'holdResolution':
-			engine.holdResolution();
-			return;
-		case 'releaseResolution':
-			engine.releaseResolution();
-			return;
-		case 'destroy':
+const workerApi = {
+	/** Starts the engine; every delta is pushed back through the proxied `onDelta`. */
+	init(onDelta: DeltaListener): void {
+		// The main thread passed `Comlink.proxy(fn)`, so each call here is really an async message.
+		const remoteOnDelta = onDelta as unknown as Comlink.Remote<DeltaListener>;
+		engine = new TileEngine({
+			asyncBatchMs: 8,
+			onDelta: (delta) => postDelta(remoteOnDelta, delta)
+		});
+	},
+	sync(frame: EngineFrameSync): void {
+		if (frame.source) {
 			abortAllPrecaches();
-			engine.destroy();
-			return;
+		}
+		engine?.sync(frame);
+	},
+	precacheViewport(
+		id: number,
+		viewport: Viewport,
+		options?: Omit<PrecacheOptions, 'signal'>
+	): Promise<PrecacheResult> {
+		return runPrecache(id, async (signal) =>
+			engine ? engine.precacheViewport(viewport, { ...options, signal }) : CANCELLED_PRECACHE_RESULT
+		);
+	},
+	precacheBounds(
+		id: number,
+		bounds: Rect | undefined,
+		mode: 'fit' | 'fill',
+		options?: Omit<PrecacheOptions & ViewportFitOptions, 'signal'>
+	): Promise<PrecacheResult> {
+		return runPrecache(id, async (signal) =>
+			engine
+				? engine.precacheBounds(bounds, mode, { ...options, signal })
+				: CANCELLED_PRECACHE_RESULT
+		);
+	},
+	abortPrecache(id: number): void {
+		precacheControllers.get(id)?.abort();
+		precacheControllers.delete(id);
+	},
+	pauseLoading(reason?: string): void {
+		engine?.pauseLoading(reason);
+	},
+	resumeLoading(reason?: string): void {
+		engine?.resumeLoading(reason);
+	},
+	holdResolution(): void {
+		engine?.holdResolution();
+	},
+	releaseResolution(): void {
+		engine?.releaseResolution();
 	}
 };
+
+export type TileEngineWorkerApi = typeof workerApi;
+
+Comlink.expose(workerApi);

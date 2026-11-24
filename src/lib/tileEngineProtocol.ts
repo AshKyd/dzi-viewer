@@ -104,32 +104,6 @@ export interface EngineFrameSync {
 	readonly clearOpaque?: boolean;
 }
 
-export type EngineInboundMessage =
-	| { readonly type: 'sync'; readonly frame: EngineFrameSync }
-	| {
-			readonly type: 'precacheViewport';
-			readonly id: number;
-			readonly viewport: Viewport;
-			readonly options?: Omit<PrecacheOptions, 'signal'>;
-	  }
-	| {
-			readonly type: 'precacheBounds';
-			readonly id: number;
-			readonly bounds?: Rect;
-			readonly mode: 'fit' | 'fill';
-			readonly options?: Omit<PrecacheOptions & ViewportFitOptions, 'signal'>;
-	  }
-	| { readonly type: 'abortPrecache'; readonly id: number }
-	| { readonly type: 'pauseLoading'; readonly reason?: string }
-	| { readonly type: 'resumeLoading'; readonly reason?: string }
-	| { readonly type: 'holdResolution' }
-	| { readonly type: 'releaseResolution' }
-	| { readonly type: 'destroy' };
-
-export type EngineOutboundMessage =
-	| { readonly type: 'delta'; readonly delta: TileEngineDelta }
-	| { readonly type: 'precacheResult'; readonly id: number; readonly result: PrecacheResult };
-
 /** What `CanvasTileRenderer` talks to: a `TileEngine` in-process or a proxy for one in a worker. */
 export interface TileEngineClient {
 	readonly isWorker: boolean;
