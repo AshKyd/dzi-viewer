@@ -121,7 +121,11 @@ export function computeTileDrawRect({
 	readonly backingScale: number;
 	readonly snapEdges: boolean;
 }): Rect {
-	const screenOrigin = stageToScreen({ x: imageBounds.x, y: imageBounds.y }, viewport, containerSize);
+	const screenOrigin = stageToScreen(
+		{ x: imageBounds.x, y: imageBounds.y },
+		viewport,
+		containerSize
+	);
 	const scaleX = (imageBounds.width * viewport.zoom) / layer.levelSize.width;
 	const scaleY = (imageBounds.height * viewport.zoom) / layer.levelSize.height;
 
@@ -194,7 +198,11 @@ export class CanvasTileRenderer {
 	// Staged changes coalesced into a single per-frame `sync` message to the engine.
 	#dirtyConfig: TileEngineConfig | undefined;
 	#dirtySource:
-		| { readonly dzi: DziDescriptor | null; readonly imageBounds: Rect | null; readonly sourceId: string }
+		| {
+				readonly dzi: DziDescriptor | null;
+				readonly imageBounds: Rect | null;
+				readonly sourceId: string;
+		  }
 		| undefined;
 	#dirtyImageBounds: Rect | null = null;
 	#hasDirtyImageBounds = false;
@@ -469,12 +477,7 @@ export class CanvasTileRenderer {
 
 		const dzi = this.#dzi;
 		const imageBounds = this.#imageBounds;
-		if (
-			!dzi ||
-			!imageBounds ||
-			this.#containerSize.width <= 0 ||
-			this.#containerSize.height <= 0
-		) {
+		if (!dzi || !imageBounds || this.#containerSize.width <= 0 || this.#containerSize.height <= 0) {
 			this.#paintViewport = this.#viewport;
 			this.#queuedViewport = null;
 			this.#needsPaint = false;
@@ -780,9 +783,7 @@ export class CanvasTileRenderer {
 	}
 
 	#canDrawTile(key: string): boolean {
-		return this.#surface.kind === 'webgl'
-			? this.#surface.hasTile(key)
-			: this.#bitmaps.has(key);
+		return this.#surface.kind === 'webgl' ? this.#surface.hasTile(key) : this.#bitmaps.has(key);
 	}
 
 	#markTileOpaque(key: string): boolean {
@@ -794,12 +795,7 @@ export class CanvasTileRenderer {
 		return true;
 	}
 
-	#drawLayers(
-		dzi: DziDescriptor,
-		imageBounds: Rect,
-		now: number,
-		useFades: boolean
-	): boolean {
+	#drawLayers(dzi: DziDescriptor, imageBounds: Rect, now: number, useFades: boolean): boolean {
 		if (this.#backingWidth <= 0 || this.#backingHeight <= 0) {
 			return false;
 		}

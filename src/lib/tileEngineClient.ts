@@ -154,7 +154,10 @@ function serializePrecacheBoundsOptions(
 	};
 }
 
-function cloneFrameSync(frame: EngineFrameSync, dziOverride?: DziDescriptor | null): EngineFrameSync {
+function cloneFrameSync(
+	frame: EngineFrameSync,
+	dziOverride?: DziDescriptor | null
+): EngineFrameSync {
 	return {
 		...(frame.config ? { config: cloneConfig(frame.config) } : {}),
 		...(frame.source
@@ -224,8 +227,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#hasImageBounds = frame.imageBounds !== null;
 		}
 		if (frame.container) {
-			this.#hasContainerSize =
-				frame.container.size.width > 0 && frame.container.size.height > 0;
+			this.#hasContainerSize = frame.container.size.width > 0 && frame.container.size.height > 0;
 		}
 
 		this.#post({ type: 'sync', frame: cloneFrameSync(frame, dziOverride) });

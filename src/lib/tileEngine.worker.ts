@@ -43,10 +43,7 @@ function abortAllPrecaches(): void {
 	precacheControllers.clear();
 }
 
-function runPrecache(
-	id: number,
-	start: (signal: AbortSignal) => Promise<PrecacheResult>
-): void {
+function runPrecache(id: number, start: (signal: AbortSignal) => Promise<PrecacheResult>): void {
 	const controller = new AbortController();
 	precacheControllers.set(id, controller);
 
