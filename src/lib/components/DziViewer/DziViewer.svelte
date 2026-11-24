@@ -3,6 +3,7 @@
 	import { devicePixelRatio } from 'svelte/reactivity/window';
 	import { CanvasTileRenderer } from '../../canvasRenderer.js';
 	import { loadDzi } from '../../dzi.js';
+	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import { EMPTY_PRECACHE_RESULT } from '../../precache.js';
 	import { DEFAULT_MAX_CONCURRENT_LOADS } from '../../tileLoader.js';
 	import { DEFAULT_MAX_DPR } from '../../tiling.js';
@@ -30,7 +31,6 @@
 	import type {
 		DziViewerProps,
 		DziViewerSnippetContext,
-		ViewerLifecycleEvent,
 		ViewerLifecycleListener
 	} from './dziViewerTypes.js';
 
@@ -72,9 +72,8 @@
 	let sourceId = $state('source-0');
 	let sourceCounter = 0;
 
-	// Bookkeeping sets that don't drive Svelte rendering directly.
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	const lifecycleListeners = new Set<ViewerLifecycleListener>();
+	const lifecycle = createLifecycleEmitter();
+	// Replayed onto a new renderer if the canvas remounts; no rendering depends on it.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const pauseReasons = new Set<string>();
 
@@ -108,16 +107,6 @@
 		syncedSourceId = nextSourceId;
 		syncedDzi = nextDzi;
 		targetRenderer.setSource(nextDzi, nextImageBounds, nextSourceId);
-	}
-
-	function emitLifecycle(event: ViewerLifecycleEvent): void {
-		Array.from(lifecycleListeners).forEach((listener) => {
-			try {
-				listener(event);
-			} catch (error) {
-				console.error('[dzi-viewer] Viewer lifecycle listener threw:', error);
-			}
-		});
 	}
 
 	/**
@@ -205,8 +194,8 @@
 	// Notify lifecycle listeners on unmount.
 	$effect(() => {
 		return () => {
-			emitLifecycle({ type: 'destroy' });
-			lifecycleListeners.clear();
+			lifecycle.emit({ type: 'destroy' });
+			lifecycle.clear();
 		};
 	});
 
@@ -287,7 +276,7 @@
 						applyInitialViewIfReady(dzi, nextSize);
 						renderer?.setViewport(effectiveViewport);
 					}
-					emitLifecycle({ type: 'resize', containerSize: nextSize });
+					lifecycle.emit({ type: 'resize', containerSize: nextSize });
 				}
 			});
 
@@ -330,7 +319,7 @@
 		);
 
 		if (sourceCounter > 1) {
-			emitLifecycle({ type: 'source-change' });
+			lifecycle.emit({ type: 'source-change' });
 		}
 
 		if (!currentSource) {
@@ -361,7 +350,7 @@
 				syncSourceToRenderer(currentRenderer, descriptor, stage.imageBounds, nextSourceId);
 				currentRenderer?.setViewport(untrack(() => effectiveViewport));
 				onLoad?.(descriptor);
-				emitLifecycle({ type: 'load', dzi: descriptor });
+				lifecycle.emit({ type: 'load', dzi: descriptor });
 			})
 			.catch((error: unknown) => {
 				if (controller.signal.aborted) {
@@ -422,10 +411,7 @@
 	}
 
 	export function subscribe(listener: ViewerLifecycleListener): () => void {
-		lifecycleListeners.add(listener);
-		return () => {
-			lifecycleListeners.delete(listener);
-		};
+		return lifecycle.subscribe(listener);
 	}
 
 	/**

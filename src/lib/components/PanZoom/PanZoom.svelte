@@ -18,11 +18,8 @@
 		stageToScreen as convertStageToScreen
 	} from '../../viewport.js';
 	import DziViewer from '../DziViewer/DziViewer.svelte';
-	import type {
-		DziViewerMethods,
-		ViewerLifecycleEvent,
-		ViewerLifecycleListener
-	} from '../DziViewer/dziViewerTypes.js';
+	import type { DziViewerMethods, ViewerLifecycleListener } from '../DziViewer/dziViewerTypes.js';
+	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
 	import {
 		computePinchStep,
@@ -65,22 +62,11 @@
 	let isDragging = $state(false);
 	let loadDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-	// Pointer positions and lifecycle subscribers are bookkeeping only, so they need no reactivity.
+	// Pointer positions are bookkeeping only, so they need no reactivity.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const activePointers = new Map<number, Point>();
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	const lifecycleListeners = new Set<ViewerLifecycleListener>();
+	const lifecycle = createLifecycleEmitter();
 	let lastAppliedViewport: Viewport = { x: Number.NaN, y: Number.NaN, zoom: Number.NaN };
-
-	function emitLifecycle(event: ViewerLifecycleEvent): void {
-		Array.from(lifecycleListeners).forEach((listener) => {
-			try {
-				listener(event);
-			} catch (error) {
-				console.error('[dzi-viewer] Viewer lifecycle listener threw:', error);
-			}
-		});
-	}
 
 	function clearLoadDebounce(): void {
 		if (loadDebounceTimer === undefined) {
@@ -120,7 +106,7 @@
 		}
 		return currentViewer.subscribe((event) => {
 			if (event.type !== 'destroy') {
-				emitLifecycle(event);
+				lifecycle.emit(event);
 			}
 		});
 	});
@@ -136,8 +122,8 @@
 		return () => {
 			clearTimeout(hintTimer);
 			clearLoadDebounce();
-			emitLifecycle({ type: 'destroy' });
-			lifecycleListeners.clear();
+			lifecycle.emit({ type: 'destroy' });
+			lifecycle.clear();
 		};
 	});
 
@@ -217,7 +203,7 @@
 			}, loadDebounceMs);
 		}
 		onInteract?.(next);
-		emitLifecycle({ type: 'interact', viewport: next });
+		lifecycle.emit({ type: 'interact', viewport: next });
 	}
 
 	/** Pans by a screen-space delta (positive moves the image right/down). */
@@ -434,10 +420,7 @@
 	}
 
 	export function subscribe(listener: ViewerLifecycleListener): () => void {
-		lifecycleListeners.add(listener);
-		return () => {
-			lifecycleListeners.delete(listener);
-		};
+		return lifecycle.subscribe(listener);
 	}
 
 	export function getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null {
