@@ -289,17 +289,16 @@ describe('TileCache and TileLoader', () => {
 
 	it('closes ImageBitmaps on delete, overwrite, eviction, clear, and stale loader completion', async () => {
 		const makeBitmap = () => {
-			const close = vi.fn();
-			return { width: 256, height: 256, close } as unknown as ImageBitmap & {
-				close: ReturnType<typeof vi.fn>;
-			};
+			const close = vi.fn<() => void>();
+			const bitmap: ImageBitmap = { width: 256, height: 256, close };
+			return { bitmap, close };
 		};
 
 		const cache = new TileCache({ maxCachedTiles: 16 });
 		const first = makeBitmap();
 		const replacement = makeBitmap();
-		cache.setReady(makeSpec(0), first);
-		cache.setReady(makeSpec(0), replacement);
+		cache.setReady(makeSpec(0), first.bitmap);
+		cache.setReady(makeSpec(0), replacement.bitmap);
 		expect(first.close).toHaveBeenCalledTimes(1);
 		expect(replacement.close).not.toHaveBeenCalled();
 
@@ -307,7 +306,7 @@ describe('TileCache and TileLoader', () => {
 		expect(replacement.close).toHaveBeenCalledTimes(1);
 
 		const bitmaps = Array.from({ length: 18 }, () => makeBitmap());
-		bitmaps.forEach((bmp, i) => cache.setReady(makeSpec(i), bmp));
+		bitmaps.forEach((entry, i) => cache.setReady(makeSpec(i), entry.bitmap));
 		cache.evict(new Set());
 		expect(bitmaps[0]?.close).toHaveBeenCalledTimes(1);
 		expect(bitmaps[1]?.close).toHaveBeenCalledTimes(1);
@@ -336,7 +335,7 @@ describe('TileCache and TileLoader', () => {
 		expect(capturedSignal?.aborted).toBe(true);
 
 		const lateBitmap = makeBitmap();
-		resolveLate(lateBitmap);
+		resolveLate(lateBitmap.bitmap);
 		await flushPromises();
 		expect(lateBitmap.close).toHaveBeenCalledTimes(1);
 		expect(cache.has('src:10:0_0')).toBe(false);

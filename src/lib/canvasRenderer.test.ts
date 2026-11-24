@@ -26,13 +26,20 @@ interface StrokeCall {
 	readonly height: number;
 }
 
-function createFakeBitmap(label: string): ImageBitmap & { readonly label: string } {
+interface FakeBitmap extends ImageBitmap {
+	readonly label: string;
+	readonly closeSpy: ReturnType<typeof vi.fn<() => void>>;
+}
+
+function createFakeBitmap(label: string): FakeBitmap {
+	const closeSpy = vi.fn<() => void>();
 	return {
 		label,
 		width: 256,
 		height: 256,
-		close: vi.fn()
-	} as unknown as ImageBitmap & { readonly label: string };
+		close: closeSpy,
+		closeSpy
+	};
 }
 
 function createMockCanvas() {
@@ -340,7 +347,7 @@ describe('CanvasTileRenderer', () => {
 
 		renderer.destroy();
 
-		expect(bitmap.close).toHaveBeenCalledTimes(1);
+		expect(bitmap.closeSpy).toHaveBeenCalledTimes(1);
 		expect(rawCanvas.width).toBe(1);
 		expect(rawCanvas.height).toBe(1);
 	});
@@ -399,7 +406,7 @@ describe('CanvasTileRenderer', () => {
 
 		expect(surface.drawTile).toHaveBeenCalledTimes(1);
 		// WebGL surfaces release the CPU-side ImageBitmap immediately once uploaded to a GPU texture.
-		expect(bitmap.close).toHaveBeenCalledTimes(1);
+		expect(bitmap.closeSpy).toHaveBeenCalledTimes(1);
 
 		// Clearing the source clears both engine tile cache entries and surface GPU textures.
 		renderer.setSource(null, null, 'src-2');

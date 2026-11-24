@@ -225,7 +225,7 @@ class Canvas2DSurface implements RenderSurface {
 
 	constructor(canvas: AnyCanvas) {
 		this.#canvas = canvas;
-		this.#ctx = canvas.getContext('2d') as AnyCanvas2DContext | null;
+		this.#ctx = canvas.getContext('2d');
 	}
 
 	resize(width: number, height: number): void {
