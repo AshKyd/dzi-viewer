@@ -19,6 +19,14 @@ export const EMPTY_PRECACHE_RESULT: PrecacheResult = Object.freeze({
 	cancelled: false
 });
 
+/** Result returned when a precache is aborted before any tile settled. */
+export const CANCELLED_PRECACHE_RESULT: PrecacheResult = Object.freeze({
+	total: 0,
+	loaded: 0,
+	failed: 0,
+	cancelled: true
+});
+
 export interface PrecacheViewportParams extends PrecacheOptions {
 	readonly dzi: DziDescriptor;
 	readonly imageBounds: Rect;

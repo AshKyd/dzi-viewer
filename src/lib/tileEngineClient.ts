@@ -1,4 +1,4 @@
-import { EMPTY_PRECACHE_RESULT } from './precache.js';
+import { CANCELLED_PRECACHE_RESULT, EMPTY_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
 import { createTileEngineWorker } from './tileEngineWorkerFactory.js';
 import type {
@@ -325,7 +325,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 		send: (id: number) => void
 	): Promise<PrecacheResult> {
 		if (signal?.aborted) {
-			return Promise.resolve({ total: 0, loaded: 0, failed: 0, cancelled: true });
+			return Promise.resolve(CANCELLED_PRECACHE_RESULT);
 		}
 
 		const id = this.#nextPrecacheId++;
@@ -338,7 +338,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 				this.#pendingPrecaches.delete(id);
 				pending.cleanupSignal();
 				this.#post({ type: 'abortPrecache', id });
-				resolve({ total: 0, loaded: 0, failed: 0, cancelled: true });
+				resolve(CANCELLED_PRECACHE_RESULT);
 			};
 
 			signal?.addEventListener('abort', onAbort, { once: true });
@@ -355,7 +355,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 		this.#pendingPrecaches.clear();
 		entries.forEach(({ resolve, cleanupSignal }) => {
 			cleanupSignal();
-			resolve({ total: 0, loaded: 0, failed: 0, cancelled: true });
+			resolve(CANCELLED_PRECACHE_RESULT);
 		});
 	}
 

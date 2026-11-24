@@ -1,3 +1,4 @@
+import { CANCELLED_PRECACHE_RESULT } from './precache.js';
 import { TileEngine } from './tileEngine.js';
 import type {
 	EngineInboundMessage,
@@ -57,7 +58,7 @@ function runPrecache(id: number, start: (signal: AbortSignal) => Promise<Precach
 			workerSelf.postMessage({
 				type: 'precacheResult',
 				id,
-				result: { total: 0, loaded: 0, failed: 0, cancelled: true }
+				result: CANCELLED_PRECACHE_RESULT
 			});
 		});
 }
