@@ -100,42 +100,47 @@ export interface DziViewerProps {
 	onTileError?: (event: TileErrorEvent) => void;
 }
 
-/** Methods exported by `DziViewer` and `PanZoom` instances (via `bind:this`). */
+/** Methods exported by `DziViewer` and `PanZoom` instances (via `bind:this`). They don't use `this`, so they can be passed around detached. */
 export interface DziViewerMethods {
 	/** Updates any subset of `x`, `y`, and `zoom` on the viewer. */
-	setViewport(viewport: Partial<Viewport>): void;
+	setViewport(this: void, viewport: Partial<Viewport>): void;
 	/** Returns the currently rendered (clamped) `{ x, y, zoom }` viewport. */
-	getViewport(): Viewport;
+	getViewport(this: void): Viewport;
 	/** Returns the resolved stage-space bounds of the loaded DZI image, or `null` before load. */
-	getImageBounds(): Rect | null;
+	getImageBounds(this: void): Rect | null;
 	/** Returns the measured container dimensions in CSS pixels. */
-	getContainerSize(): Size;
+	getContainerSize(this: void): Size;
 	/** Subscribes to viewer lifecycle events (`load`, `resize`, `source-change`, `interact`, `destroy`). */
-	subscribe(listener: ViewerLifecycleListener): () => void;
+	subscribe(this: void, listener: ViewerLifecycleListener): () => void;
 	/** Viewport that fits `bounds` inside the container (defaults to the image bounds). */
-	getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
+	getFitViewport(this: void, bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
 	/** Viewport that fills the container with `bounds` (defaults to the image bounds). */
-	getFillViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
+	getFillViewport(this: void, bounds?: Rect, options?: ViewportFitOptions): Viewport | null;
 	/** Loads the optimal tiles for `targetViewport` into the cache ahead of time. */
-	precacheViewport(targetViewport: Viewport, options?: PrecacheOptions): Promise<PrecacheResult>;
+	precacheViewport(
+		this: void,
+		targetViewport: Viewport,
+		options?: PrecacheOptions
+	): Promise<PrecacheResult>;
 	/** Loads the optimal tiles for a fit or fill view of `bounds` into the cache ahead of time. */
 	precacheBounds(
+		this: void,
 		bounds: Rect | undefined,
 		mode: 'fit' | 'fill',
 		options?: PrecacheOptions & ViewportFitOptions
 	): Promise<PrecacheResult>;
-	stageToScreen(point: Point): Point;
-	screenToStage(point: Point): Point;
+	stageToScreen(this: void, point: Point): Point;
+	screenToStage(this: void, point: Point): Point;
 	/**
 	 * Stops starting new tile downloads for the viewport, e.g. while animating or until a custom debounce
 	 * settles. The visible tile list keeps updating, so `resumeLoading()` only fetches what the final
 	 * viewport needs. Precache requests and loads already in flight still complete.
 	 * Pass an optional `reason` token to scope independent callers.
 	 */
-	pauseLoading(reason?: string): void;
+	pauseLoading(this: void, reason?: string): void;
 	/** Starts downloading viewport tiles again after `pauseLoading()`. */
-	resumeLoading(reason?: string): void;
-	isLoadingPaused(): boolean;
+	resumeLoading(this: void, reason?: string): void;
+	isLoadingPaused(this: void): boolean;
 	/**
 	 * Stops the viewer switching to a sharper pyramid level, e.g. during a zoom animation, so it doesn't
 	 * mount a new set of tiles at every level it passes through. Zooming in shows the held level enlarged;
@@ -143,8 +148,8 @@ export interface DziViewerMethods {
 	 * downloads for the held level continue unless loading is also paused.
 	 * Does nothing until a DZI has loaded and the container has a size.
 	 */
-	holdResolution(): void;
+	holdResolution(this: void): void;
 	/** Lets the viewer pick the best level for the current zoom again after `holdResolution()`. */
-	releaseResolution(): void;
-	isResolutionHeld(): boolean;
+	releaseResolution(this: void): void;
+	isResolutionHeld(this: void): boolean;
 }

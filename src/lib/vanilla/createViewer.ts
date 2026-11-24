@@ -1,9 +1,9 @@
 import { mount, unmount } from 'svelte';
 import DziViewer from '../components/DziViewer/DziViewer.svelte';
 import type { DziViewerMethods, DziViewerProps } from '../components/DziViewer/dziViewerTypes.js';
+import { createViewerMethodProxy } from '../components/DziViewer/viewerMethodProxy.js';
 import PanZoom from '../components/PanZoom/PanZoom.svelte';
 import type { PanZoomProps } from '../components/PanZoom/panZoomTypes.js';
-import { EMPTY_PRECACHE_RESULT } from '../precache.js';
 import {
 	ReactiveBridge,
 	type StateChangeListener,
@@ -58,46 +58,24 @@ function createController(
 		props: { component, bridge }
 	}) as MountedBridge;
 
-	const viewer = () => mounted?.getViewer();
+	const viewerMethods = createViewerMethodProxy(() => mounted?.getViewer(), {
+		getViewport: () => bridge.getViewport(),
+		getContainerSize: () => bridge.getSnapshot().containerSize,
+		setViewport: (viewport) => {
+			if (mounted) {
+				bridge.update(viewport);
+			}
+		}
+	});
 
 	return {
+		...viewerMethods,
 		update(props) {
 			if (mounted) {
 				bridge.update(props);
 			}
 		},
-		setViewport(viewport) {
-			if (!mounted) {
-				return;
-			}
-			const currentViewer = viewer();
-			if (currentViewer) {
-				currentViewer.setViewport(viewport);
-				return;
-			}
-			bridge.update(viewport);
-		},
-		getViewport: () => viewer()?.getViewport() ?? bridge.getViewport(),
-		getImageBounds: () => viewer()?.getImageBounds() ?? null,
-		getContainerSize: () => viewer()?.getContainerSize() ?? bridge.getSnapshot().containerSize,
-		subscribe: (listener) => viewer()?.subscribe(listener) ?? (() => undefined),
 		getState: () => bridge.getSnapshot(),
-		getFitViewport: (bounds, fitOptions) => viewer()?.getFitViewport(bounds, fitOptions) ?? null,
-		getFillViewport: (bounds, fitOptions) => viewer()?.getFillViewport(bounds, fitOptions) ?? null,
-		precacheViewport: (targetViewport, precacheOptions) =>
-			viewer()?.precacheViewport(targetViewport, precacheOptions) ??
-			Promise.resolve(EMPTY_PRECACHE_RESULT),
-		precacheBounds: (bounds, mode, precacheOptions) =>
-			viewer()?.precacheBounds(bounds, mode, precacheOptions) ??
-			Promise.resolve(EMPTY_PRECACHE_RESULT),
-		stageToScreen: (point) => viewer()?.stageToScreen(point) ?? point,
-		screenToStage: (point) => viewer()?.screenToStage(point) ?? point,
-		pauseLoading: (reason) => viewer()?.pauseLoading(reason),
-		resumeLoading: (reason) => viewer()?.resumeLoading(reason),
-		isLoadingPaused: () => viewer()?.isLoadingPaused() ?? false,
-		holdResolution: () => viewer()?.holdResolution(),
-		releaseResolution: () => viewer()?.releaseResolution(),
-		isResolutionHeld: () => viewer()?.isResolutionHeld() ?? false,
 		destroy() {
 			if (!mounted) {
 				return;

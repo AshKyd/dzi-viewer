@@ -1,23 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
-	import { EMPTY_PRECACHE_RESULT } from '../../precache.js';
-	import type {
-		DziDescriptor,
-		Point,
-		PrecacheOptions,
-		PrecacheResult,
-		Rect,
-		Size,
-		Viewport,
-		ViewportFitOptions
-	} from '../../types.js';
-	import {
-		clampViewport,
-		screenToStage as convertScreenToStage,
-		stageToScreen as convertStageToScreen
-	} from '../../viewport.js';
+	import type { DziDescriptor, Point, Size, Viewport } from '../../types.js';
+	import { clampViewport } from '../../viewport.js';
 	import DziViewer from '../DziViewer/DziViewer.svelte';
+	import { createViewerMethodProxy } from '../DziViewer/viewerMethodProxy.js';
 	import type { DziViewerMethods, ViewerLifecycleListener } from '../DziViewer/dziViewerTypes.js';
 	import { createLifecycleEmitter } from '../../lifecycleEmitter.js';
 	import type { PanZoomProps } from './panZoomTypes.js';
@@ -391,99 +378,40 @@
 		}
 	}
 
-	export function setViewport(viewport: Partial<Viewport>): void {
-		if (viewer) {
-			viewer.setViewport(viewport);
-			return;
-		}
-		if (viewport.x !== undefined) {
-			x = viewport.x;
-		}
-		if (viewport.y !== undefined) {
-			y = viewport.y;
-		}
-		if (viewport.zoom !== undefined) {
-			zoom = viewport.zoom;
-		}
-	}
+	// --- Exported methods (see `DziViewerMethods`), forwarded to the inner `DziViewer` ---
 
-	export function getViewport(): Viewport {
-		return viewer?.getViewport() ?? untrack(() => currentViewport());
-	}
+	const viewerMethods = createViewerMethodProxy(() => viewer, {
+		getViewport: () => untrack(() => currentViewport()),
+		getContainerSize: () => untrack(() => containerSize),
+		setViewport: (viewport) => {
+			x = viewport.x ?? x;
+			y = viewport.y ?? y;
+			zoom = viewport.zoom ?? zoom;
+		}
+	});
 
-	export function getImageBounds(): Rect | null {
-		return viewer?.getImageBounds() ?? null;
-	}
+	export const {
+		setViewport,
+		getViewport,
+		getImageBounds,
+		getContainerSize,
+		getFitViewport,
+		getFillViewport,
+		precacheViewport,
+		precacheBounds,
+		stageToScreen,
+		screenToStage,
+		pauseLoading,
+		resumeLoading,
+		isLoadingPaused,
+		holdResolution,
+		releaseResolution,
+		isResolutionHeld
+	} = viewerMethods;
 
-	export function getContainerSize(): Size {
-		return viewer?.getContainerSize() ?? untrack(() => containerSize);
-	}
-
+	/** Own listener set, because `PanZoom` also emits `interact` and forwards the inner viewer's events. */
 	export function subscribe(listener: ViewerLifecycleListener): () => void {
 		return lifecycle.subscribe(listener);
-	}
-
-	export function getFitViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null {
-		return viewer?.getFitViewport(bounds, options) ?? null;
-	}
-
-	export function getFillViewport(bounds?: Rect, options?: ViewportFitOptions): Viewport | null {
-		return viewer?.getFillViewport(bounds, options) ?? null;
-	}
-
-	export function precacheViewport(
-		targetViewport: Viewport,
-		options?: PrecacheOptions
-	): Promise<PrecacheResult> {
-		return (
-			viewer?.precacheViewport(targetViewport, options) ?? Promise.resolve(EMPTY_PRECACHE_RESULT)
-		);
-	}
-
-	export function precacheBounds(
-		bounds: Rect | undefined,
-		mode: 'fit' | 'fill',
-		options?: PrecacheOptions & ViewportFitOptions
-	): Promise<PrecacheResult> {
-		return viewer?.precacheBounds(bounds, mode, options) ?? Promise.resolve(EMPTY_PRECACHE_RESULT);
-	}
-
-	export function stageToScreen(point: Point): Point {
-		return (
-			viewer?.stageToScreen(point) ??
-			untrack(() => convertStageToScreen(point, currentViewport(), containerSize))
-		);
-	}
-
-	export function screenToStage(point: Point): Point {
-		return (
-			viewer?.screenToStage(point) ??
-			untrack(() => convertScreenToStage(point, currentViewport(), containerSize))
-		);
-	}
-
-	export function pauseLoading(reason?: string): void {
-		viewer?.pauseLoading(reason);
-	}
-
-	export function resumeLoading(reason?: string): void {
-		viewer?.resumeLoading(reason);
-	}
-
-	export function isLoadingPaused(): boolean {
-		return viewer?.isLoadingPaused() ?? false;
-	}
-
-	export function holdResolution(): void {
-		viewer?.holdResolution();
-	}
-
-	export function releaseResolution(): void {
-		viewer?.releaseResolution();
-	}
-
-	export function isResolutionHeld(): boolean {
-		return viewer?.isResolutionHeld() ?? false;
 	}
 </script>
 
