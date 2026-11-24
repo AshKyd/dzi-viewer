@@ -47,7 +47,7 @@ function restoreHtmlCanvasStyle(canvas: AnyCanvas): void {
 /**
  * Hardware-accelerated WebGL2 tile surface powered by `rapid-render`.
  * Uploads each tile `ImageBitmap` once as a GPU texture, batches sprites per frame, and destroys
- * GPU textures in lockstep with `TileCache` evictions.
+ * GPU textures when the engine evicts the tile.
  */
 class RapidWebGLSurface implements RenderSurface {
 	readonly kind = 'webgl';
@@ -295,11 +295,11 @@ class Canvas2DSurface implements RenderSurface {
 	}
 
 	evictTile(): void {
-		// Canvas 2D draws directly from `CachedTile.bitmap` with no separate GPU texture handle.
+		// Canvas 2D draws straight from the renderer's bitmaps, so there is no texture to free.
 	}
 
 	clearTiles(): void {
-		// Nothing to free beyond `TileCache.clear()`.
+		// The renderer closes its own bitmaps; there is nothing held here.
 	}
 
 	destroy(): void {

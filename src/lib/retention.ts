@@ -96,10 +96,9 @@ export function mergeAdjacentRects(rects: readonly Rect[], epsilon = COVERAGE_EP
 
 /**
  * Orders tiles by row then column.
- *
- * Tiles are absolutely positioned, so their DOM order never affects what's drawn. A fixed order matters
- * for speed: `optimalTiles` is sorted by distance from the viewport centre, which changes every frame while
- * panning, and a keyed `{#each}` would otherwise physically move tile elements in the DOM on every frame.
+ * `optimalTiles` arrive sorted by distance from the viewport centre, which changes every frame while
+ * panning. A fixed grid order keeps the layer signature stable, so the engine only emits a new layer
+ * list when the set of tiles actually changes.
  */
 export function byGridPosition(a: CachedTile, b: CachedTile): number {
 	return a.row - b.row || a.col - b.col;
@@ -126,7 +125,7 @@ export interface RenderPlan {
 }
 
 /**
- * Builds the ordered list of DOM level layers to render.
+ * Builds the list of level layers to paint, bottom to top.
  * Reuses already-decoded tiles from coarser (under-zoom) and finer (over-zoom) levels
  * underneath the optimal level until 100% of visible optimal tiles are decoded and opaque.
  */
