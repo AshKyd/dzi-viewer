@@ -1,5 +1,5 @@
 import { EMPTY_PRECACHE_RESULT } from './precache.js';
-import { createRenderSurface, type RenderSurface } from './renderSurface.js';
+import { createRenderSurface, type AnyCanvas, type RenderSurface } from './renderSurface.js';
 import { createTileEngineClient, type TileEngineClient } from './tileEngineClient.js';
 import type {
 	BaseTileSnapshot,
@@ -31,8 +31,7 @@ export const SAFARI_MAX_CANVAS_PIXELS = 16_777_216;
 /** Default per-frame time budget (ms) for uploading decoded tile bitmaps to GPU textures. */
 export const DEFAULT_UPLOAD_BUDGET_MS = 4;
 
-export type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
-export type AnyCanvas2DContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+export type { AnyCanvas, AnyCanvas2DContext } from './renderSurface.js';
 
 export interface CanvasRendererConfig extends TileEngineConfig {
 	readonly tileFadeDuration?: number;

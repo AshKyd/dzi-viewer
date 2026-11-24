@@ -8,8 +8,10 @@ import {
 	TextureWrapMode,
 	Vec2
 } from 'rapid-render';
-import type { AnyCanvas, AnyCanvas2DContext } from './canvasRenderer.js';
 import type { Rect } from './types.js';
+
+export type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
+export type AnyCanvas2DContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 export interface RenderSurface {
 	readonly kind: 'webgl' | '2d';
