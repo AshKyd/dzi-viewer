@@ -169,9 +169,7 @@ function cloneFrameSync(
 					}
 				}
 			: {}),
-		...('imageBounds' in frame && frame.imageBounds !== undefined
-			? { imageBounds: cloneRect(frame.imageBounds) }
-			: {}),
+		...(frame.imageBounds !== undefined ? { imageBounds: cloneRect(frame.imageBounds) } : {}),
 		...(frame.container
 			? {
 					container: {
@@ -223,7 +221,7 @@ class WorkerTileEngineClient implements TileEngineClient {
 			this.#hasImageBounds = frame.source.imageBounds !== null;
 			this.#resolutionHeld = false;
 			this.#cancelPendingPrecaches();
-		} else if ('imageBounds' in frame && frame.imageBounds !== undefined) {
+		} else if (frame.imageBounds !== undefined) {
 			this.#hasImageBounds = frame.imageBounds !== null;
 		}
 		if (frame.container) {

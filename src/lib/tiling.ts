@@ -20,29 +20,6 @@ export function makeTileKey(sourceId: string, level: number, col: number, row: n
 	return `${sourceId}:${level}:${col}_${row}`;
 }
 
-interface LevelEntry {
-	readonly level: number;
-	readonly width: number;
-	readonly height: number;
-}
-
-const levelTableCache = new WeakMap<object, readonly LevelEntry[]>();
-
-function getLevelTable(
-	dzi: Pick<DziDescriptor, 'width' | 'height' | 'minLevel' | 'maxLevel'>
-): readonly LevelEntry[] {
-	const cached = levelTableCache.get(dzi);
-	if (cached) {
-		return cached;
-	}
-	const table = getLevelRange(dzi).map((level) => {
-		const size = getLevelSize(dzi, level);
-		return { level, width: size.width, height: size.height };
-	});
-	levelTableCache.set(dzi, table);
-	return table;
-}
-
 /**
  * Selects the smallest pyramid level whose native pixel dimensions meet or exceed
  * the image's rendered screen size scaled by `effectiveDpr`.
@@ -61,11 +38,13 @@ export function getOptimalLevel(
 	const targetWidth = imageBounds.width * zoom * density;
 	const targetHeight = imageBounds.height * zoom * density;
 
-	const match = getLevelTable(dzi).find(
-		(entry) => entry.width >= targetWidth && entry.height >= targetHeight
-	);
+	// `getLevelSize` is cached per descriptor, so this scan stays cheap on every frame.
+	const match = getLevelRange(dzi).find((level) => {
+		const size = getLevelSize(dzi, level);
+		return size.width >= targetWidth && size.height >= targetHeight;
+	});
 
-	return match ? match.level : dzi.maxLevel;
+	return match ?? dzi.maxLevel;
 }
 
 export interface ViewportTilesParams {
@@ -123,11 +102,10 @@ export function getViewportTileGrid({
 		Math.min(maxLevel, getOptimalLevel(dzi, imageBounds, viewport.zoom, effectiveDpr));
 	const level = Math.min(dzi.maxLevel, Math.max(dzi.minLevel, requestedLevel));
 
-	if (imageBounds.width <= 0 || imageBounds.height <= 0) {
-		return { level, visibleBounds, colMin: 0, colMax: -1, rowMin: 0, rowMax: -1, empty: true };
-	}
-
-	const intersection = rectIntersection(visibleBounds, imageBounds);
+	const intersection =
+		imageBounds.width > 0 && imageBounds.height > 0
+			? rectIntersection(visibleBounds, imageBounds)
+			: null;
 	if (!intersection) {
 		return { level, visibleBounds, colMin: 0, colMax: -1, rowMin: 0, rowMax: -1, empty: true };
 	}

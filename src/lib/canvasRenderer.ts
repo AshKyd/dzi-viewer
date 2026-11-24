@@ -856,11 +856,9 @@ export class CanvasTileRenderer {
 					alpha = Math.min(1, Math.max(0, (now - startedAt) / this.#tileFadeDuration));
 					if (alpha >= 1) {
 						this.#markTileOpaque(tile.key);
-						// Schedule one follow-up frame so the engine drops fallbacks covered by this tile.
-						needsAnotherFrame = true;
-					} else {
-						needsAnotherFrame = true;
 					}
+					// Keep animating the fade, or run one more frame so the engine drops fallbacks it now covers.
+					needsAnotherFrame = true;
 				}
 
 				this.#surface.drawTile(tile.key, this.#bitmaps.get(tile.key), rect, alpha);

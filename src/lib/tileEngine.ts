@@ -106,6 +106,8 @@ export class TileEngine {
 	#cachedSelection: ViewportTilesResult | null = null;
 	#cachedPlan: RenderPlan | null = null;
 	#cachedPlanGridSignature = '';
+	#lastEvaluatedPlan: RenderPlan | null = null;
+	#lastEvaluatedOptimalOrder: readonly string[] = [];
 
 	#lastEmittedLayersSignature = '';
 	#lastEmittedOptimalLoaded = false;
@@ -171,7 +173,7 @@ export class TileEngine {
 		if (frame.source) {
 			const nextDzi = dziOverride !== undefined ? dziOverride : frame.source.dzi;
 			this.#applySource(nextDzi, frame.source.imageBounds, frame.source.sourceId);
-		} else if ('imageBounds' in frame && frame.imageBounds !== undefined) {
+		} else if (frame.imageBounds !== undefined) {
 			this.#applyImageBounds(frame.imageBounds);
 		}
 		if (frame.container) {
@@ -424,9 +426,6 @@ export class TileEngine {
 		}
 		return { ...spec, distanceSq: -1 };
 	}
-
-	#lastEvaluatedPlan: RenderPlan | null = null;
-	#lastEvaluatedOptimalOrder: readonly string[] = [];
 
 	#evaluate(): void {
 		const dzi = this.#dzi;
