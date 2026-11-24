@@ -1,5 +1,6 @@
-// Everything except the Svelte components and vanilla factories.
-// Shared by the Svelte entry (`index.ts`) and the vanilla entry (`vanilla/index.ts`).
+// Public API shared by the Svelte entry (`index.ts`) and the vanilla entry (`vanilla/index.ts`):
+// the viewer types, camera, viewport maths, and DZI helpers for building your own renderer.
+// Tile loading, caching and painting classes are internal and not exported.
 
 export type {
 	DziViewerMethods,
@@ -17,6 +18,7 @@ export {
 	computeWheelZoomMultiplier,
 	DEFAULT_COOPERATIVE_GESTURE_MESSAGES,
 	panByScreenDelta,
+	pinchAroundMidpoint,
 	zoomAroundPoint
 } from './components/PanZoom/panZoomUtils.js';
 
@@ -73,41 +75,11 @@ export type {
 	TransitionResult
 } from './camera.js';
 
-export {
-	buildSingleTileSpec,
-	buildTilesForGrid,
-	clampDpr,
-	DEFAULT_MAX_DPR,
-	getOptimalLevel,
-	getTilesForViewport,
-	getViewportTileGrid,
-	makeTileKey
-} from './tiling.js';
-export type { ViewportTileGrid, ViewportTilesParams, ViewportTilesResult } from './tiling.js';
-export { TileCache } from './tileCache.js';
-export { DEFAULT_MAX_CONCURRENT_LOADS, TileLoader } from './tileLoader.js';
-export type { TileLoaderConfig, TileLoaderOptions } from './tileLoader.js';
-export { computeRenderPlan, subtractRect, subtractRects } from './retention.js';
-export { CanvasTileRenderer, DEFAULT_UPLOAD_BUDGET_MS } from './canvasRenderer.js';
-export {
-	computeBackingSize,
-	computeTileDrawRect,
-	SAFARI_MAX_CANVAS_PIXELS
-} from './canvasGeometry.js';
-export type { BackingCanvasSize } from './canvasGeometry.js';
-export type { RenderSurface } from './renderSurface.js';
-export type {
-	AnyCanvas,
-	AnyCanvas2DContext,
-	CanvasRendererCallbacks,
-	CanvasRendererConfig,
-	CanvasRendererOptions
-} from './canvasRenderer.js';
-export { EMPTY_PRECACHE_RESULT, precacheBounds, precacheViewport } from './precache.js';
+export { getOptimalLevel, getTilesForViewport } from './tiling.js';
+export type { ViewportTilesParams, ViewportTilesResult } from './tiling.js';
 
 export type {
 	BoundsTarget,
-	CachedTile,
 	DisplayRect,
 	DziDescriptor,
 	DziJsonDisplayRect,
@@ -122,12 +94,10 @@ export type {
 	PrecacheOptions,
 	PrecacheResult,
 	Rect,
-	RenderLevelLayer,
 	Size,
 	TileErrorEvent,
 	TileGrid,
 	TileSpec,
-	TileStatus,
 	TileUrlBuilder,
 	TransitionCurve,
 	Viewport,
