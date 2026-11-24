@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0](https://github.com/AshKyd/dzi-viewer/compare/v0.4.0...v0.5.0) (2026-11-24)
+
+### Features
+
+* use rapid-render 3d acceleration & workerise ([a41667e](https://github.com/AshKyd/dzi-viewer/commit/a41667e75e6814d47be58063d2d09362a358ffa1))
+
 ## [0.4.0](https://github.com/AshKyd/dzi-viewer/compare/v0.3.0...v0.4.0) (2026-11-23)
 
 ### Features
