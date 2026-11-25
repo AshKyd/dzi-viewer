@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0](https://github.com/AshKyd/dzi-viewer/compare/v0.5.1...v1.0.0) (2026-11-25)
+
+### ⚠ BREAKING CHANGES
+
+* TileCache, TileLoader, CanvasTileRenderer, computeRenderPlan, subtractRect(s), standalone precacheViewport/precacheBounds, EMPTY_PRECACHE_RESULT, canvas sizing helpers, tile-grid builders and internal types (CachedTile, RenderLevelLayer, TileStatus, ViewportTileGrid) are no longer exported.
+
+### Bug Fixes
+
+* PanZoom coordinate helpers no longer return input unchanged before mount ([096f69c](https://github.com/AshKyd/dzi-viewer/commit/096f69cd240010eaf62893aeb9514eedd123208d))
+
+### Code Refactoring
+
+* limit public exports to the documented viewer API ([5126879](https://github.com/AshKyd/dzi-viewer/commit/5126879920d36563ed66056b0cc7ef04e004f52e))
+
 ## [0.5.1](https://github.com/AshKyd/dzi-viewer/compare/v0.5.0...v0.5.1) (2026-11-24)
 
 ### Bug Fixes

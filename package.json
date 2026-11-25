@@ -1,6 +1,6 @@
 {
 	"name": "dzi-viewer",
-	"version": "0.5.1",
+	"version": "1.0.0",
 	"description": "Lightweight WebGL2 / canvas Deep Zoom (DZI) image viewer for Svelte 5 and vanilla JavaScript.",
 	"license": "ISC",
 	"homepage": "https://github.com/AshKyd/dzi-viewer#readme",
